@@ -1,14 +1,18 @@
 // lib/features/profile/screens/profile_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // TODO: Remplacer par de vraies données utilisateur depuis l'API
+    final user = _getUserPlaceholder();
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -30,10 +34,10 @@ class ProfileScreen extends StatelessWidget {
                     color: AppColors.accent,
                     shape: BoxShape.circle,
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      'JD',
-                      style: TextStyle(
+                      user['initials']!,  // ← Ajout du !
+                      style: const TextStyle(
                         color: AppColors.background,
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
@@ -42,25 +46,31 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'John Doe',
-                  style: TextStyle(
+                Text(
+                  user['name']!,  // ← Ajout du !
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  '+33 6 12 34 56 78',
-                  style: TextStyle(
+                Text(
+                  user['phone'] ?? 'Non renseigné',
+                  style: const TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Modification du profil à venir'),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.surfaceLight,
                     foregroundColor: AppColors.textPrimary,
@@ -77,13 +87,13 @@ class ProfileScreen extends StatelessWidget {
           
           const SizedBox(height: 24),
           
-          // Stats
+          // Stats (TODO: récupérer depuis l'API)
           Row(
             children: [
               Expanded(
                 child: _StatCard(
                   label: 'Tabs actives',
-                  value: '3',
+                  value: '0',
                   icon: Iconsax.wallet_25,
                 ),
               ),
@@ -91,7 +101,7 @@ class ProfileScreen extends StatelessWidget {
               Expanded(
                 child: _StatCard(
                   label: 'Amis',
-                  value: '12',
+                  value: '0',
                   icon: Iconsax.people5,
                 ),
               ),
@@ -107,17 +117,17 @@ class ProfileScreen extends StatelessWidget {
               _SettingsItem(
                 icon: Iconsax.notification,
                 title: 'Notifications',
-                onTap: () {},
+                onTap: () => _showComingSoon(context),
               ),
               _SettingsItem(
                 icon: Iconsax.shield_tick,
                 title: 'Confidentialité',
-                onTap: () {},
+                onTap: () => _showComingSoon(context),
               ),
               _SettingsItem(
                 icon: Iconsax.bank,
                 title: 'Comptes bancaires',
-                onTap: () {},
+                onTap: () => _showComingSoon(context),
               ),
             ],
           ),
@@ -130,12 +140,12 @@ class ProfileScreen extends StatelessWidget {
               _SettingsItem(
                 icon: Iconsax.message_question,
                 title: 'Aide',
-                onTap: () {},
+                onTap: () => _showComingSoon(context),
               ),
               _SettingsItem(
                 icon: Iconsax.document_text,
                 title: 'Conditions d\'utilisation',
-                onTap: () {},
+                onTap: () => _showComingSoon(context),
               ),
             ],
           ),
@@ -149,20 +159,83 @@ class ProfileScreen extends StatelessWidget {
                 icon: Iconsax.logout,
                 title: 'Déconnexion',
                 isDestructive: true,
-                onTap: () {},
+                onTap: () => _showLogoutDialog(context),
               ),
             ],
           ),
           
           const SizedBox(height: 32),
           
-          Center(
+          const Center(
             child: Text(
               'Version 1.0.0',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textTertiary,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Map<String, String?> _getUserPlaceholder() {  // ← Changé en String?
+    // TODO: Remplacer par les vraies données de l'utilisateur connecté
+    return {
+      'initials': 'U',
+      'name': 'Utilisateur',
+      'phone': null,  // ← Maintenant accepté
+    };
+  }
+  
+  void _showComingSoon(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Fonctionnalité à venir'),
+        backgroundColor: AppColors.accent,
+      ),
+    );
+  }
+  
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Déconnexion',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Êtes-vous sûr de vouloir vous déconnecter ?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Implémenter la déconnexion
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Déconnexion à venir'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            },
+            child: const Text(
+              'Déconnexion',
+              style: TextStyle(color: AppColors.error),
             ),
           ),
         ],

@@ -156,7 +156,7 @@ export class TabsService {
       creditorName: 'Moi',
       debtorId: 'paul_123',
       debtorName: 'Paul',
-      amount: 47.50,
+      amount: 42.50,
       description: '🍕 Pizza vendredi soir',
       status: TabStatus.CONFIRMED,
       createdAt: new Date('2025-10-20'),

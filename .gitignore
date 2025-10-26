@@ -57,3 +57,42 @@ backend/build/
 backend/.env
 backend/.env.local
 backend/.env.*.local
+
+
+# Environment variables (CRITICAL - ne jamais commit)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets/
+ssl/
+
+# Database
+*.sql
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

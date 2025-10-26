@@ -4,6 +4,7 @@ class Friend {
   final String id;
   final String name;
   final String? phoneNumber;
+  final String? email;
   final String? avatarUrl;
   final DateTime addedAt;
   
@@ -11,6 +12,7 @@ class Friend {
     required this.id,
     required this.name,
     this.phoneNumber,
+    this.email,
     this.avatarUrl,
     required this.addedAt,
   });
@@ -28,6 +30,7 @@ class Friend {
       id: json['id'],
       name: json['name'],
       phoneNumber: json['phoneNumber'],
+      email: json['email'],
       avatarUrl: json['avatarUrl'],
       addedAt: DateTime.parse(json['addedAt']),
     );
@@ -38,6 +41,7 @@ class Friend {
       'id': id,
       'name': name,
       'phoneNumber': phoneNumber,
+      'email': email,
       'avatarUrl': avatarUrl,
       'addedAt': addedAt.toIso8601String(),
     };
