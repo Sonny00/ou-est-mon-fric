@@ -16,6 +16,11 @@ dependencies:
   # HTTP & API
   dio: ^5.4.0
   
+  # Auth & Security
+  flutter_secure_storage: ^9.0.0
+  google_sign_in: ^6.2.1
+  google_sign_in_web: ^0.12.3+3
+  
   # Local Storage
   shared_preferences: ^2.2.2
   hive: ^2.2.3
@@ -57,3 +62,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/icons/google_logo.svg

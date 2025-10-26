@@ -1,37 +1,49 @@
+// lib/data/models/user_model.dart
+
 class UserModel {
   final String id;
-  final String phoneNumber;
-  final String? name;
+  final String email;
+  final String name;
+  final String? phoneNumber;
   final String? avatarUrl;
-  final DateTime createdAt;
-  
+  final bool isEmailVerified;
+
   UserModel({
     required this.id,
-    required this.phoneNumber,
-    this.name,
+    required this.email,
+    required this.name,
+    this.phoneNumber,
     this.avatarUrl,
-    required this.createdAt,
+    required this.isEmailVerified,
   });
 
-  String get displayName => name ?? phoneNumber;
+  String get initials {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'],
-      phoneNumber: json['phoneNumber'],
+      email: json['email'],
       name: json['name'],
+      phoneNumber: json['phoneNumber'],
       avatarUrl: json['avatarUrl'],
-      createdAt: DateTime.parse(json['createdAt']),
+      isEmailVerified: json['isEmailVerified'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'phoneNumber': phoneNumber,
+      'email': email,
       'name': name,
+      'phoneNumber': phoneNumber,
       'avatarUrl': avatarUrl,
-      'createdAt': createdAt.toIso8601String(),
+      'isEmailVerified': isEmailVerified,
     };
   }
 }
