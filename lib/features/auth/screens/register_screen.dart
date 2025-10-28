@@ -272,6 +272,69 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 32),
+
+// Bouton TEMPORAIRE - Skip Auth
+Container(
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: AppColors.error.withOpacity(0.1),
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: AppColors.error, width: 2, style: BorderStyle.solid),
+  ),
+  child: Column(
+    children: [
+      const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Iconsax.warning_2, color: AppColors.error, size: 20),
+          SizedBox(width: 8),
+          Text(
+            'MODE DEBUG',
+            style: TextStyle(
+              color: AppColors.error,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MainNavigationScreen(),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.error,
+            foregroundColor: AppColors.background,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text(
+            '⚡ Skip Auth (Dev only)',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+// ========== FIN DU BOUTON ==========
+
+
                 
                 const SizedBox(height: 24),
                 

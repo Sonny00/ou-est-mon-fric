@@ -8,6 +8,8 @@ import '../../../data/models/tab_model.dart';
 import '../widgets/tab_card.dart';
 import '../widgets/balance_widget.dart';
 import '../providers/tabs_provider.dart';
+import 'create_tab_screen.dart';
+
 
 class TabsListScreen extends ConsumerStatefulWidget {
   const TabsListScreen({Key? key}) : super(key: key);
@@ -240,13 +242,13 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
   }
   
   void _showCreateTabDialog() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Formulaire de création à venir'),
-        backgroundColor: AppColors.accent,
-      ),
-    );
-  }
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const CreateTabScreen(),
+    ),
+  );
+}
   
   List<TabModel> _getFilteredTabs(List<TabModel> tabs) {
     if (_selectedFilter == 'all') {
