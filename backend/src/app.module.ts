@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { TabsModule } from './tabs/tabs.module';
+import { FriendsModule } from './friends/friends.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TabsModule } from './tabs/tabs.module';
       logging: true,
     }),
     TabsModule,
+    FriendsModule,
   ],
   controllers: [AppController],
 })

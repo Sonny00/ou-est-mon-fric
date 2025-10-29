@@ -8,37 +8,58 @@ class FriendRepository {
   
   FriendRepository(this._apiService);
   
-  // Pour l'instant, retourne une liste vide
-  // Plus tard, tu auras un vrai endpoint /friends
+  // Récupérer tous les amis
   Future<List<Friend>> getFriends() async {
     try {
-      // TODO: Implémenter quand le backend aura /friends
-      // final response = await _apiService.get('/friends');
+      final response = await _apiService.get('/friends');
       
-      // Pour l'instant, retourne vide
-      return [];
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'];
+        return data.map((json) => Friend.fromJson(json)).toList();
+      } else {
+        throw Exception('API returned success: false');
+      }
     } catch (e) {
       throw Exception('Impossible de charger les amis: $e');
     }
   }
   
+  // Ajouter un ami
   Future<Friend> addFriend(Map<String, dynamic> data) async {
     try {
-      // TODO: Implémenter quand le backend aura POST /friends
-      // final response = await _apiService.post('/friends', data: data);
+      final response = await _apiService.post('/friends', data: data);
       
-      throw UnimplementedError('API /friends pas encore implémentée');
+      if (response['success'] == true) {
+        return Friend.fromJson(response['data']);
+      } else {
+        throw Exception('API returned success: false');
+      }
     } catch (e) {
       throw Exception('Impossible d\'ajouter l\'ami: $e');
     }
   }
   
+  // Supprimer un ami
   Future<void> deleteFriend(String id) async {
     try {
-      // TODO: Implémenter quand le backend aura DELETE /friends/:id
-      throw UnimplementedError('API /friends pas encore implémentée');
+      await _apiService.delete('/friends/$id');
     } catch (e) {
       throw Exception('Impossible de supprimer l\'ami: $e');
+    }
+  }
+  
+  // Modifier un ami
+  Future<Friend> updateFriend(String id, Map<String, dynamic> data) async {
+    try {
+      final response = await _apiService.patch('/friends/$id', data: data);
+      
+      if (response['success'] == true) {
+        return Friend.fromJson(response['data']);
+      } else {
+        throw Exception('API returned success: false');
+      }
+    } catch (e) {
+      throw Exception('Impossible de modifier l\'ami: $e');
     }
   }
 }
