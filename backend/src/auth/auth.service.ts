@@ -1,5 +1,4 @@
 // backend/src/auth/auth.service.ts
-
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -98,16 +97,20 @@ export class AuthService {
 
     // Si toujours pas trouvé, créer un nouvel utilisateur
     if (!user) {
-      user = this.userRepository.create({
-        ...googleUser,
+      const newUser = this.userRepository.create({
+        email: googleUser.email,
+        name: googleUser.name,
+        googleId: googleUser.googleId,
+        avatarUrl: googleUser.avatarUrl,
         isEmailVerified: true,
+        password: '', // Pas de mot de passe pour Google OAuth
       });
-      await this.userRepository.save(user);
+      user = await this.userRepository.save(newUser);
     } else if (!user.googleId) {
       // Lier le compte Google existant
       user.googleId = googleUser.googleId;
       user.isEmailVerified = true;
-      await this.userRepository.save(user);
+      user = await this.userRepository.save(user);
     }
 
     // Générer le token JWT
@@ -125,12 +128,11 @@ export class AuthService {
   }
 
   private generateToken(user: User): string {
-    const payload = { 
-      sub: user.id, 
+    const payload = {
+      sub: user.id,
       email: user.email,
       name: user.name,
     };
-    
     return this.jwtService.sign(payload);
   }
 

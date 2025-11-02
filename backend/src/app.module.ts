@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { TabsModule } from './tabs/tabs.module';
 import { FriendsModule } from './friends/friends.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { FriendsModule } from './friends/friends.module';
     }),
     TabsModule,
     FriendsModule,
+    AuthModule,
   ],
   controllers: [AppController],
 })
