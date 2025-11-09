@@ -2,6 +2,7 @@
 
 import 'package:dio/dio.dart';
 import '../../core/config/api_config.dart';
+import 'token_storage.dart'; // ← AJOUTER CET IMPORT
 
 class ApiService {
   late final Dio _dio;
@@ -38,42 +39,33 @@ class ApiService {
     // 2. Auth interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
+        onRequest: (options, handler) async { // ← AJOUTER async
           // Add auth token if exists
-          final token = _getStoredToken();
-          if (token != null) {
+          final token = await TokenStorage.getToken(); // ← MODIFIER CETTE LIGNE
+          if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
+            print('🔐 Token added to ${options.path}'); // Debug
+          } else {
+            print('⚠️ No token for ${options.path}'); // Debug
           }
           return handler.next(options);
         },
         onError: (error, handler) {
-          // Auto-refresh token on 401
+          // Auto-logout on 401
           if (error.response?.statusCode == 401) {
-            // TODO: Refresh token logic
+            print('❌ 401 Unauthorized - Token may be invalid'); // Debug
+            // TODO: Navigate to login screen
           }
           return handler.next(error);
         },
       ),
     );
-    
-    // 3. Retry interceptor (optionnel)
-    // _dio.interceptors.add(
-    //   RetryInterceptor(
-    //     dio: _dio,
-    //     retries: 3,
-    //     retryDelays: [
-    //       Duration(seconds: 1),
-    //       Duration(seconds: 2),
-    //       Duration(seconds: 3),
-    //     ],
-    //   ),
-    // );
   }
   
-  String? _getStoredToken() {
-    // TODO: Get from secure storage
-    return null;
-  }
+  // ← SUPPRIMER CETTE FONCTION (plus besoin)
+  // String? _getStoredToken() {
+  //   return null;
+  // }
   
   // GET
   Future<Map<String, dynamic>> get(
@@ -210,12 +202,15 @@ class ApiService {
     }
   }
   
-  void setAuthToken(String token) {
-    _dio.options.headers['Authorization'] = 'Bearer $token';
+  // Méthodes utilitaires (garder)
+  Future<void> setAuthToken(String token) async {
+    await TokenStorage.saveToken(token); // ← MODIFIER
+    print('💾 Token saved via setAuthToken'); // Debug
   }
   
-  void removeAuthToken() {
-    _dio.options.headers.remove('Authorization');
+  Future<void> removeAuthToken() async {
+    await TokenStorage.deleteToken(); // ← MODIFIER
+    print('🗑️ Token removed'); // Debug
   }
   
   void dispose() {
