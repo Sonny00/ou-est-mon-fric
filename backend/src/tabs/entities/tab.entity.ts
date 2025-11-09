@@ -1,4 +1,4 @@
-// src/tabs/entities/tab.entity.ts
+// backend/src/tabs/entities/tab.entity.ts
 
 import {
   Entity,
@@ -13,7 +13,6 @@ export enum TabStatus {
   CONFIRMED = 'confirmed',
   REPAYMENT_REQUESTED = 'repayment_requested',
   SETTLED = 'settled',
-  DISPUTED = 'disputed',
 }
 
 @Entity('tabs')
@@ -33,7 +32,14 @@ export class TabEntity {
   @Column()
   debtorName: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value),
+    },
+  })
   amount: number;
 
   @Column()
@@ -57,6 +63,12 @@ export class TabEntity {
 
   @Column({ nullable: true })
   disputeReason: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  repaymentDeadline: Date;
+
+  @Column({ default: false })
+  deadlineNotificationSent: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

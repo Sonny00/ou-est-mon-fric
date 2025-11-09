@@ -6,25 +6,78 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/friend_model.dart';
 import '../providers/friends_provider.dart';
+import '../../../data/repositories/friend_repository.dart';
 
-class FriendsScreen extends ConsumerWidget {
+
+class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FriendsScreen> createState() => _FriendsScreenState();
+}
+
+class _FriendsScreenState extends ConsumerState<FriendsScreen> {
+  String _searchQuery = '';
+  bool _isSearching = false;
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final friendsAsync = ref.watch(friendsProvider);
     
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Mes Amis'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher un ami...',
+                  hintStyle: const TextStyle(color: AppColors.textSecondary),
+                  border: InputBorder.none,
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Iconsax.close_circle, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              )
+            : const Text('Mes Amis'),
         actions: [
           IconButton(
-            icon: const Icon(Iconsax.search_normal),
+            icon: Icon(_isSearching ? Iconsax.close_square : Iconsax.search_normal),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Recherche à venir')),
-              );
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                } else {
+                  _searchFocusNode.requestFocus();
+                }
+              });
             },
           ),
         ],
@@ -77,54 +130,135 @@ class FriendsScreen extends ConsumerWidget {
           if (friends.isEmpty) {
             return _EmptyState();
           }
+
+          // Filtrer les amis en temps réel
+          final filteredFriends = _searchQuery.isEmpty
+              ? friends
+              : friends.where((friend) {
+                  final query = _searchQuery.toLowerCase();
+                  return friend.name.toLowerCase().contains(query) ||
+                         (friend.phoneNumber?.contains(query) ?? false) ||
+                         (friend.email?.toLowerCase().contains(query) ?? false);
+                }).toList();
+
+          // Afficher un message si aucun résultat
+          if (filteredFriends.isEmpty && _searchQuery.isNotEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Iconsax.search_status,
+                    size: 64,
+                    color: AppColors.textTertiary,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Aucun résultat',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Aucun ami trouvé pour "$_searchQuery"',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
           
-          return RefreshIndicator(
-            color: AppColors.accent,
-            onRefresh: () async {
-              ref.refresh(friendsProvider);
-            },
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: friends.length,
-              itemBuilder: (context, index) {
-               return _FriendCard(
-  friend: friends[index],
-  onTap: () => _showFriendDetails(context, friends[index], ref),
-);
-              },
-            ),
+          return Column(
+            children: [
+              // Badge de résultats
+              if (_searchQuery.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: AppColors.surface,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Iconsax.search_normal_1,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${filteredFriends.length} résultat${filteredFriends.length > 1 ? 's' : ''}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Liste des amis
+              Expanded(
+                child: RefreshIndicator(
+                  color: AppColors.accent,
+                  onRefresh: () async {
+                    ref.refresh(friendsProvider);
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredFriends.length,
+                    itemBuilder: (context, index) {
+                      return _FriendCard(
+                        friend: filteredFriends[index],
+                        searchQuery: _searchQuery,
+                        onTap: () => _showFriendDetails(
+                          context,
+                          filteredFriends[index],
+                          ref,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          color: AppColors.accent,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accent.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _showAddFriendDialog(context, ref),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              width: 56,
-              height: 56,
-              child: const Icon(
-                Iconsax.user_add,
-                color: AppColors.background,
-                size: 24,
+      floatingActionButton: _isSearching
+          ? null
+          : Container(
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showAddFriendDialog(context, ref),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    child: const Icon(
+                      Iconsax.user_add,
+                      color: AppColors.background,
+                      size: 24,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
   
@@ -143,7 +277,7 @@ class FriendsScreen extends ConsumerWidget {
           Container(
             width: 80,
             height: 80,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.accent,
               shape: BoxShape.circle,
             ),
@@ -185,7 +319,6 @@ class FriendsScreen extends ConsumerWidget {
                   icon: Iconsax.add_circle,
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Navigation vers création de tab avec cet ami
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Création de tab à venir')),
                     );
@@ -198,70 +331,7 @@ class FriendsScreen extends ConsumerWidget {
                   label: 'Supprimer',
                   icon: Iconsax.trash,
                   isDestructive: true,
-                  onTap: () async {
-                    Navigator.pop(context);
-                    
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        backgroundColor: AppColors.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text(
-                          'Supprimer cet ami ?',
-                          style: TextStyle(color: AppColors.textPrimary),
-                        ),
-                        content: Text(
-                          'Êtes-vous sûr de vouloir supprimer ${friend.name} ?',
-                          style: const TextStyle(color: AppColors.textSecondary),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text(
-                              'Annuler',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text(
-                              'Supprimer',
-                              style: TextStyle(color: AppColors.error),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (confirm == true && context.mounted) {
-                      try {
-                        final repository = ref.read(friendRepositoryProvider);
-                        await repository.deleteFriend(friend.id);
-                        
-                        ref.refresh(friendsProvider);
-                        
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${friend.name} supprimé'),
-                              backgroundColor: AppColors.success,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Erreur: $e'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
+                  onTap: () => _handleDeleteFriend(context, friend, ref),
                 ),
               ),
             ],
@@ -271,136 +341,229 @@ class FriendsScreen extends ConsumerWidget {
     ),
   );
 }
+
+// Nouvelle fonction séparée pour gérer la suppression
+Future<void> _handleDeleteFriend(BuildContext context, Friend friend, WidgetRef ref) async {
+  // Fermer le bottom sheet
+  Navigator.pop(context);
   
- void _showAddFriendDialog(BuildContext context, WidgetRef ref) {
-  final nameController = TextEditingController();
-  final phoneController = TextEditingController();
-  bool isLoading = false;
-  
-  showDialog(
+  // Afficher la confirmation
+  final confirm = await showDialog<bool>(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: const Text(
+        'Supprimer cet ami ?',
+        style: TextStyle(color: AppColors.textPrimary),
+      ),
+      content: Text(
+        'Êtes-vous sûr de vouloir supprimer ${friend.name} ? Cette action est irréversible.',
+        style: const TextStyle(color: AppColors.textSecondary),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text(
+            'Annuler',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
         ),
-        title: const Text(
-          'Ajouter un ami',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              style: const TextStyle(color: AppColors.textPrimary),
-              decoration: InputDecoration(
-                labelText: 'Nom',
-                labelStyle: const TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.accent),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: phoneController,
-              style: const TextStyle(color: AppColors.textPrimary),
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'Téléphone (optionnel)',
-                labelStyle: const TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.accent),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: isLoading ? null : () => Navigator.pop(context),
-            child: const Text(
-              'Annuler',
-              style: TextStyle(color: AppColors.textSecondary),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text(
+            'Supprimer',
+            style: TextStyle(
+              color: AppColors.error,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          TextButton(
-            onPressed: isLoading
-                ? null
-                : () async {
-                    if (nameController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Le nom est requis'),
-                          backgroundColor: AppColors.error,
-                        ),
-                      );
-                      return;
-                    }
+        ),
+      ],
+    ),
+  );
 
-                    setState(() => isLoading = true);
+  // Si confirmé, supprimer
+  if (confirm == true && context.mounted) {
+    // Afficher un loader
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: AppColors.accent),
+      ),
+    );
 
-                    try {
-                      final repository = ref.read(friendRepositoryProvider);
-                      await repository.addFriend({
-                        'name': nameController.text.trim(),
-                        if (phoneController.text.isNotEmpty)
-                          'phoneNumber': phoneController.text.trim(),
-                      });
-
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ref.refresh(friendsProvider);
+    try {
+      // Supprimer l'ami
+      final repository = ref.read(friendRepositoryProvider);
+      await repository.deleteFriend(friend.id);
+      
+      if (context.mounted) {
+        // Fermer le loader
+        Navigator.pop(context);
+        
+        // Rafraîchir la liste
+        ref.refresh(friendsProvider);
+        
+        // Afficher le succès
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${friend.name} a été supprimé'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        // Fermer le loader
+        Navigator.pop(context);
+        
+        // Afficher l'erreur
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+}
+  
+  void _showAddFriendDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    bool isLoading = false;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Ajouter un ami',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Nom',
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.accent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                style: const TextStyle(color: AppColors.textPrimary),
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Téléphone (optionnel)',
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.accent),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              child: const Text(
+                'Annuler',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (nameController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${nameController.text} ajouté !'),
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      setState(() => isLoading = false);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Erreur: $e'),
+                          const SnackBar(
+                            content: Text('Le nom est requis'),
                             backgroundColor: AppColors.error,
                           ),
                         );
+                        return;
                       }
-                    }
-                  },
-            child: isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.accent,
+
+                      setState(() => isLoading = true);
+
+                      try {
+                        final repository = ref.read(friendRepositoryProvider);
+                        await repository.addFriend({
+                          'name': nameController.text.trim(),
+                          if (phoneController.text.isNotEmpty)
+                            'phoneNumber': phoneController.text.trim(),
+                        });
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ref.refresh(friendsProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${nameController.text} ajouté !'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setState(() => isLoading = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.accent,
+                      ),
+                    )
+                  : const Text(
+                      'Ajouter',
+                      style: TextStyle(color: AppColors.accent),
                     ),
-                  )
-                : const Text(
-                    'Ajouter',
-                    style: TextStyle(color: AppColors.accent),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
@@ -452,10 +615,12 @@ class _EmptyState extends StatelessWidget {
 
 class _FriendCard extends StatelessWidget {
   final Friend friend;
+  final String searchQuery;
   final VoidCallback onTap;
   
   const _FriendCard({
     required this.friend,
+    required this.searchQuery,
     required this.onTap,
   });
 
@@ -476,7 +641,7 @@ class _FriendCard extends StatelessWidget {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppColors.accent,
                     shape: BoxShape.circle,
                   ),
@@ -496,8 +661,9 @@ class _FriendCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        friend.name,
+                      _HighlightedText(
+                        text: friend.name,
+                        query: searchQuery,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -506,8 +672,9 @@ class _FriendCard extends StatelessWidget {
                       ),
                       if (friend.phoneNumber != null) ...[
                         const SizedBox(height: 4),
-                        Text(
-                          friend.phoneNumber!,
+                        _HighlightedText(
+                          text: friend.phoneNumber!,
+                          query: searchQuery,
                           style: const TextStyle(
                             fontSize: 13,
                             color: AppColors.textTertiary,
@@ -526,6 +693,55 @@ class _FriendCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HighlightedText extends StatelessWidget {
+  final String text;
+  final String query;
+  final TextStyle style;
+
+  const _HighlightedText({
+    required this.text,
+    required this.query,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (query.isEmpty) {
+      return Text(text, style: style);
+    }
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final index = lowerText.indexOf(lowerQuery);
+
+    if (index == -1) {
+      return Text(text, style: style);
+    }
+
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: text.substring(0, index),
+            style: style,
+          ),
+          TextSpan(
+            text: text.substring(index, index + query.length),
+            style: style.copyWith(
+              backgroundColor: AppColors.accent.withOpacity(0.2),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(
+            text: text.substring(index + query.length),
+            style: style,
+          ),
+        ],
       ),
     );
   }

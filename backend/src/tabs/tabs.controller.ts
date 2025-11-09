@@ -1,4 +1,4 @@
-﻿// src/tabs/tabs.controller.ts
+﻿// backend/src/tabs/tabs.controller.ts
 
 import {
   Controller,
@@ -10,18 +10,22 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { TabsService } from './tabs.service';
 import { CreateTabDto } from './dto/create-tab.dto';
 import { UpdateTabDto } from './dto/update-tab.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('tabs')
+@UseGuards(JwtAuthGuard) // ← Protéger toutes les routes
 export class TabsController {
   constructor(private readonly tabsService: TabsService) {}
 
   @Get()
-  async findAll() {
-    const data = await this.tabsService.findAll();
+  async findAll(@CurrentUser() user: any) {
+    const data = await this.tabsService.findAllByUser(user.id);
     return {
       success: true,
       data,
@@ -29,8 +33,8 @@ export class TabsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const data = await this.tabsService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    const data = await this.tabsService.findOne(id, user.id);
     return {
       success: true,
       data,
@@ -39,8 +43,8 @@ export class TabsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createTabDto: CreateTabDto) {
-    const data = await this.tabsService.create(createTabDto);
+  async create(@Body() createTabDto: CreateTabDto, @CurrentUser() user: any) {
+    const data = await this.tabsService.create(createTabDto, user.id);
     return {
       success: true,
       data,
@@ -49,8 +53,12 @@ export class TabsController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateTabDto: UpdateTabDto) {
-    const data = await this.tabsService.update(id, updateTabDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateTabDto: UpdateTabDto,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.tabsService.update(id, updateTabDto, user.id);
     return {
       success: true,
       data,
@@ -60,8 +68,8 @@ export class TabsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async remove(@Param('id') id: string) {
-    const data = await this.tabsService.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    const data = await this.tabsService.remove(id, user.id);
     return {
       success: true,
       data,
@@ -70,8 +78,8 @@ export class TabsController {
 
   @Post(':id/confirm')
   @HttpCode(HttpStatus.OK)
-  async confirmTab(@Param('id') id: string) {
-    const data = await this.tabsService.confirmTab(id);
+  async confirmTab(@Param('id') id: string, @CurrentUser() user: any) {
+    const data = await this.tabsService.confirmTab(id, user.id);
     return {
       success: true,
       data,
@@ -83,9 +91,10 @@ export class TabsController {
   @HttpCode(HttpStatus.OK)
   async requestRepayment(
     @Param('id') id: string,
-    @Body('proofImageUrl') proofImageUrl?: string,
+    @Body('proofImageUrl') proofImageUrl: string | undefined,
+    @CurrentUser() user: any,
   ) {
-    const data = await this.tabsService.requestRepayment(id, proofImageUrl);
+    const data = await this.tabsService.requestRepayment(id, user.id, proofImageUrl);
     return {
       success: true,
       data,
@@ -95,8 +104,8 @@ export class TabsController {
 
   @Post(':id/confirm-repayment')
   @HttpCode(HttpStatus.OK)
-  async confirmRepayment(@Param('id') id: string) {
-    const data = await this.tabsService.confirmRepayment(id);
+  async confirmRepayment(@Param('id') id: string, @CurrentUser() user: any) {
+    const data = await this.tabsService.confirmRepayment(id, user.id);
     return {
       success: true,
       data,

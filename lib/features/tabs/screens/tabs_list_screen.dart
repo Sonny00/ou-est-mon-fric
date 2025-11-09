@@ -9,7 +9,7 @@ import '../widgets/tab_card.dart';
 import '../widgets/balance_widget.dart';
 import '../providers/tabs_provider.dart';
 import 'create_tab_screen.dart';
-
+import 'edit_tab_screen.dart'; // ← AJOUTER cet import
 
 class TabsListScreen extends ConsumerStatefulWidget {
   const TabsListScreen({Key? key}) : super(key: key);
@@ -141,9 +141,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                             return TabCard(
                               tab: filteredTabs[index],
                               currentUserId: 'current_user',
-                              onTap: () {
-                                // TODO: Navigate to detail
-                              },
+                              onTap: () => _showTabDetails(filteredTabs[index]), // ← MODIFIER cette ligne
                             );
                           },
                         ),
@@ -242,13 +240,299 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
   }
   
   void _showCreateTabDialog() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const CreateTabScreen(),
-    ),
-  );
-}
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CreateTabScreen(),
+      ),
+    );
+  }
+
+  // ========== AJOUTER CETTE FONCTION ==========
+  void _showTabDetails(TabModel tab) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: tab.iOwe('current_user') 
+                            ? AppColors.error.withOpacity(0.1)
+                            : AppColors.success.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        tab.iOwe('current_user') ? Iconsax.arrow_up : Iconsax.arrow_down,
+                        color: tab.iOwe('current_user') ? AppColors.error : AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tab.iOwe('current_user') 
+                                ? 'Tu dois à ${tab.creditorName}'
+                                : '${tab.debtorName} te doit',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${tab.amount.toStringAsFixed(2)} €',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: tab.iOwe('current_user') ? AppColors.error : AppColors.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Description
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Description',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        tab.description,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Deadline si présente
+                if (tab.hasDeadline) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: tab.isOverdue 
+                          ? AppColors.error.withOpacity(0.1)
+                          : AppColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: tab.isOverdue ? AppColors.error : AppColors.accent,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          tab.isOverdue ? Iconsax.danger : Iconsax.clock,
+                          color: tab.isOverdue ? AppColors.error : AppColors.accent,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tab.isOverdue ? 'En retard !' : 'Date limite',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: tab.isOverdue ? AppColors.error : AppColors.accent,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                tab.deadlineStatus,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditTabScreen(tab: tab),
+                            ),
+                          );
+                          if (result == true) {
+                            ref.refresh(tabsProvider);
+                          }
+                        },
+                        icon: const Icon(Iconsax.edit, size: 18),
+                        label: const Text('Modifier'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          side: const BorderSide(color: AppColors.accent),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showDeleteConfirmation(tab);
+                        },
+                        icon: const Icon(Iconsax.trash, size: 18),
+                        label: const Text('Supprimer'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ========== AJOUTER CETTE FONCTION ==========
+  void _showDeleteConfirmation(TabModel tab) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Supprimer cette tab ?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Cette action est irréversible.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await ref.read(tabsNotifierProvider.notifier).deleteTab(tab.id);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tab supprimée'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  // =========================================
   
   List<TabModel> _getFilteredTabs(List<TabModel> tabs) {
     if (_selectedFilter == 'all') {

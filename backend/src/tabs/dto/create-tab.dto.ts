@@ -1,4 +1,6 @@
-﻿import { IsString, IsNotEmpty, IsNumber, Min, IsOptional } from 'class-validator';
+﻿// backend/src/tabs/dto/create-tab.dto.ts
+
+import { IsString, IsNotEmpty, IsNumber, Min, IsOptional, IsDateString } from 'class-validator';
 
 export class CreateTabDto {
   @IsString()
@@ -28,4 +30,10 @@ export class CreateTabDto {
   @IsString()
   @IsOptional()
   proofImageUrl?: string;
+
+  // ========== AJOUTER CETTE LIGNE ==========
+  @IsDateString()
+  @IsOptional()
+  repaymentDeadline?: string;
+  // =========================================
 }

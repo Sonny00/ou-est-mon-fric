@@ -20,7 +20,8 @@ class MyApp extends StatelessWidget {
       title: 'OuEstMonFric',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const LoginScreen(),  // ← Commencer par la page de connexion
+      locale: const Locale('fr', 'FR'), 
+      home: const LoginScreen(),  
     );
   }
 }

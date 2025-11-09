@@ -4,189 +4,205 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../auth/screens/login_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Remplacer par de vraies données utilisateur depuis l'API
-    final user = _getUserPlaceholder();
+    final authState = ref.watch(authStateProvider);
     
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Profil'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Header profil
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: AppStyles.card(),
-            child: Column(
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      user['initials']!,  // ← Ajout du !
-                      style: const TextStyle(
-                        color: AppColors.background,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  user['name']!,  // ← Ajout du !
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user['phone'] ?? 'Non renseigné',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Modification du profil à venir'),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.surfaceLight,
-                    foregroundColor: AppColors.textPrimary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Modifier le profil'),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Stats (TODO: récupérer depuis l'API)
-          Row(
+      body: authState.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
+        error: (error, _) => Center(
+          child: Text('Erreur: $error'),
+        ),
+        data: (user) {
+          if (user == null) {
+            return const Center(child: Text('Non connecté'));
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Expanded(
-                child: _StatCard(
-                  label: 'Tabs actives',
-                  value: '0',
-                  icon: Iconsax.wallet_25,
+              // Header profil
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: AppStyles.card(),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          user.name.substring(0, 2).toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.background,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      user.name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.email,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    if (user.phoneNumber != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        user.phoneNumber!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Modification du profil à venir'),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.surfaceLight,
+                        foregroundColor: AppColors.textPrimary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Modifier le profil'),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  label: 'Amis',
-                  value: '0',
-                  icon: Iconsax.people5,
+              
+              const SizedBox(height: 24),
+              
+              // Stats (TODO: récupérer depuis l'API)
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatCard(
+                      label: 'Tabs actives',
+                      value: '0',
+                      icon: Iconsax.wallet_25,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatCard(
+                      label: 'Amis',
+                      value: '0',
+                      icon: Iconsax.people5,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Paramètres
+              _SettingsSection(
+                title: 'Général',
+                items: [
+                  _SettingsItem(
+                    icon: Iconsax.notification,
+                    title: 'Notifications',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _SettingsItem(
+                    icon: Iconsax.shield_tick,
+                    title: 'Confidentialité',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _SettingsItem(
+                    icon: Iconsax.bank,
+                    title: 'Comptes bancaires',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _SettingsSection(
+                title: 'Support',
+                items: [
+                  _SettingsItem(
+                    icon: Iconsax.message_question,
+                    title: 'Aide',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _SettingsItem(
+                    icon: Iconsax.document_text,
+                    title: 'Conditions d\'utilisation',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _SettingsSection(
+                title: 'Compte',
+                items: [
+                  _SettingsItem(
+                    icon: Iconsax.logout,
+                    title: 'Déconnexion',
+                    isDestructive: true,
+                    onTap: () => _showLogoutDialog(context, ref),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 32),
+              
+              const Center(
+                child: Text(
+                  'Version 1.0.0',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textTertiary,
+                  ),
                 ),
               ),
             ],
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Paramètres
-          _SettingsSection(
-            title: 'Général',
-            items: [
-              _SettingsItem(
-                icon: Iconsax.notification,
-                title: 'Notifications',
-                onTap: () => _showComingSoon(context),
-              ),
-              _SettingsItem(
-                icon: Iconsax.shield_tick,
-                title: 'Confidentialité',
-                onTap: () => _showComingSoon(context),
-              ),
-              _SettingsItem(
-                icon: Iconsax.bank,
-                title: 'Comptes bancaires',
-                onTap: () => _showComingSoon(context),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _SettingsSection(
-            title: 'Support',
-            items: [
-              _SettingsItem(
-                icon: Iconsax.message_question,
-                title: 'Aide',
-                onTap: () => _showComingSoon(context),
-              ),
-              _SettingsItem(
-                icon: Iconsax.document_text,
-                title: 'Conditions d\'utilisation',
-                onTap: () => _showComingSoon(context),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _SettingsSection(
-            title: 'Compte',
-            items: [
-              _SettingsItem(
-                icon: Iconsax.logout,
-                title: 'Déconnexion',
-                isDestructive: true,
-                onTap: () => _showLogoutDialog(context),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 32),
-          
-          const Center(
-            child: Text(
-              'Version 1.0.0',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textTertiary,
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
-  }
-  
-  Map<String, String?> _getUserPlaceholder() {  // ← Changé en String?
-    // TODO: Remplacer par les vraies données de l'utilisateur connecté
-    return {
-      'initials': 'U',
-      'name': 'Utilisateur',
-      'phone': null,  // ← Maintenant accepté
-    };
   }
   
   void _showComingSoon(BuildContext context) {
@@ -198,7 +214,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
   
-  void _showLogoutDialog(BuildContext context) {
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -223,15 +239,33 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implémenter la déconnexion
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Déconnexion à venir'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
+            onPressed: () async {
+              try {
+                // Déconnexion
+                await ref.read(authStateProvider.notifier).logout();
+                
+                if (context.mounted) {
+                  Navigator.pop(context); // Fermer le dialog
+                  
+                  // Rediriger vers login
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text(
               'Déconnexion',
@@ -382,7 +416,7 @@ class _SettingsItem extends StatelessWidget {
               ),
               Icon(
                 Iconsax.arrow_right_3,
-                size: 16,
+                size: 16,  // ← Virgule ajoutée
                 color: AppColors.textTertiary,
               ),
             ],

@@ -1,4 +1,5 @@
 // backend/src/auth/auth.service.ts
+
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,6 +18,8 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
+    console.log('📝 Register attempt:', registerDto.email); // Debug
+
     // Vérifier si l'email existe déjà
     const existingUser = await this.userRepository.findOne({
       where: { email: registerDto.email },
@@ -35,47 +38,58 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    await this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+    console.log('✅ User created:', savedUser.id); // Debug
 
     // Générer le token JWT
-    const token = this.generateToken(user);
+    const token = this.generateToken(savedUser);
 
     return {
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
+        id: savedUser.id,
+        email: savedUser.email,
+        name: savedUser.name,
+        phoneNumber: savedUser.phoneNumber,
+        avatarUrl: savedUser.avatarUrl,
       },
       token,
     };
   }
 
   async login(loginDto: LoginDto) {
+    console.log('🔐 Login attempt:', loginDto.email); // Debug
+
     // Trouver l'utilisateur
     const user = await this.userRepository.findOne({
       where: { email: loginDto.email },
     });
 
+    console.log('👤 User found:', user ? user.id : 'NOT FOUND'); // Debug
+
     if (!user) {
+      console.log('❌ User not found'); // Debug
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Vérifier le password
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    console.log('🔑 Password valid:', isPasswordValid); // Debug
 
     if (!isPasswordValid) {
+      console.log('❌ Invalid password'); // Debug
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Générer le token JWT
     const token = this.generateToken(user);
+    console.log('✅ Login successful, token generated'); // Debug
 
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        phoneNumber: user.phoneNumber,
         avatarUrl: user.avatarUrl,
       },
       token,
@@ -83,6 +97,8 @@ export class AuthService {
   }
 
   async googleLogin(googleUser: any) {
+    console.log('🔵 Google login attempt:', googleUser.email); // Debug
+
     // Chercher l'utilisateur par Google ID
     let user = await this.userRepository.findOne({
       where: { googleId: googleUser.googleId },
@@ -133,7 +149,12 @@ export class AuthService {
       email: user.email,
       name: user.name,
     };
-    return this.jwtService.sign(payload);
+
+    console.log('🎫 Generating token with payload:', payload); // Debug
+    const token = this.jwtService.sign(payload);
+    console.log('🎫 Token generated:', token.substring(0, 20) + '...'); // Debug
+    
+    return token;
   }
 
   async getMe(userId: string) {
