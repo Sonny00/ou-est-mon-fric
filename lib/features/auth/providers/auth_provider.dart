@@ -4,6 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/user_model.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/api_service.dart';
+import '../../../data/services/token_storage.dart';
+import '../../tabs/providers/tabs_provider.dart';
+import '../../friends/providers/friends_provider.dart';
+import '../../activity/providers/activity_provider.dart';
+import '../../../data/services/token_storage.dart';
+
+
+final apiServiceProvider = Provider<ApiService>((ref) {
+  return ApiService();
+});
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final apiService = ref.watch(apiServiceProvider);
@@ -12,30 +22,54 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
   final repository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(repository);
+  return AuthNotifier(repository, ref);
 });
 
 class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final AuthRepository _repository;
+  final Ref _ref;
 
-  AuthNotifier(this._repository) : super(const AsyncValue.loading()) {
+  AuthNotifier(this._repository, this._ref) : super(const AsyncValue.loading()) {
+    // ✅ Vérifier l'authentification au démarrage
     checkAuth();
   }
 
+  /// ✅ Vérifier si l'utilisateur est déjà connecté (avec token)
   Future<void> checkAuth() async {
-    try {
-      final isAuth = await _repository.isAuthenticated();
-      if (isAuth) {
-        final user = await _repository.getMe();
-        state = AsyncValue.data(user);
-      } else {
-        state = const AsyncValue.data(null);
-      }
-    } catch (e, st) {
+  print('🔍 AuthNotifier: Vérification de l\'authentification...');
+  
+  try {
+    // Vérifier si un token existe
+    final hasToken = await TokenStorage.hasToken();
+    
+    if (!hasToken) {
+      print('⚠️ AuthNotifier: Aucun token trouvé');
+      state = const AsyncValue.data(null);
+      return;
+    }
+
+    print('✅ AuthNotifier: Token trouvé, récupération des infos utilisateur...');
+    
+    // Récupérer les infos de l'utilisateur
+    final user = await _repository.getMe();
+    state = AsyncValue.data(user);
+    
+    print('✅ AuthNotifier: Utilisateur connecté - ${user.name}');
+  } catch (e, st) {
+    print('❌ AuthNotifier: Erreur lors de la vérification - $e');
+    
+    // Si erreur 401, le token est invalide -> déconnecter
+    if (e.toString().contains('401') || e.toString().contains('Non autorisé')) {
+      print('⚠️ AuthNotifier: Token invalide, déconnexion...');
+      await TokenStorage.deleteToken();
+      state = const AsyncValue.data(null);
+    } else {
       state = AsyncValue.error(e, st);
     }
   }
+}
 
+  /// S'inscrire
   Future<void> register({
     required String name,
     required String email,
@@ -44,50 +78,111 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   }) async {
     state = const AsyncValue.loading();
     try {
+      print('📝 AuthNotifier: Inscription en cours...');
+      
       final result = await _repository.register(
         name: name,
         email: email,
         password: password,
         phoneNumber: phoneNumber,
       );
-      state = AsyncValue.data(result['user']);
+      
+      final user = result['user'];
+      state = AsyncValue.data(user);
+      
+      print('✅ AuthNotifier: Inscription réussie - ${user.name}');
     } catch (e, st) {
+      print('❌ AuthNotifier: Erreur inscription - $e');
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
+  /// Se connecter
   Future<void> login({
     required String email,
     required String password,
   }) async {
     state = const AsyncValue.loading();
     try {
+      print('🔐 AuthNotifier: Connexion en cours...');
+      
       final result = await _repository.login(
         email: email,
         password: password,
       );
-      state = AsyncValue.data(result['user']);
+      
+      final user = result['user'];
+      state = AsyncValue.data(user);
+      
+      print('✅ AuthNotifier: Connexion réussie - ${user.name}');
     } catch (e, st) {
+      print('❌ AuthNotifier: Erreur connexion - $e');
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
+  /// Se connecter avec Google
   Future<void> signInWithGoogle() async {
     state = const AsyncValue.loading();
     try {
+      print('🔐 AuthNotifier: Connexion Google en cours...');
+      
       final result = await _repository.signInWithGoogle();
-      state = AsyncValue.data(result['user']);
+      
+      final user = result['user'];
+      state = AsyncValue.data(user);
+      
+      print('✅ AuthNotifier: Connexion Google réussie - ${user.name}');
     } catch (e, st) {
+      print('❌ AuthNotifier: Erreur Google Sign-In - $e');
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
+  /// ✅ Déconnexion avec nettoyage complet
   Future<void> logout() async {
-    await _repository.logout();
-    state = const AsyncValue.data(null);
+    try {
+      print('🔓 AuthNotifier: Déconnexion en cours...');
+      
+      // 1. Supprimer le token
+      await _repository.logout();
+      
+      // 2. Invalider tous les providers pour nettoyer le cache
+      _ref.invalidate(tabsProvider);
+      _ref.invalidate(friendsNotifierProvider);
+      _ref.invalidate(activityProvider);
+      
+      // 3. Mettre l'état à null
+      state = const AsyncValue.data(null);
+      
+      print('✅ AuthNotifier: Déconnexion réussie');
+    } catch (e, st) {
+      print('❌ AuthNotifier: Erreur lors de la déconnexion - $e');
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
   }
 }
 
-final apiServiceProvider = Provider<ApiService>((ref) {
-  return ApiService();
+/// ✅ Helper pour savoir si l'utilisateur est connecté
+final isAuthenticatedProvider = Provider<bool>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.when(
+    data: (user) => user != null,
+    loading: () => false,
+    error: (_, __) => false,
+  );
+});
+
+/// ✅ Helper pour récupérer l'utilisateur actuel
+final currentUserProvider = Provider<UserModel?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.when(
+    data: (user) => user,
+    loading: () => null,
+    error: (_, __) => null,
+  );
 });

@@ -7,7 +7,7 @@ buildscript {
     }
     dependencies {
         // ✅ Flutter demande au minimum 8.1.1
-        classpath 'com.android.tools.build:gradle:8.1.1'
+        classpath 'com.android.tools.build:gradle:8.0.2'
         // Plugin Flutter
         classpath 'dev.flutter:flutter-gradle-plugin'
     }

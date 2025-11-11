@@ -3,10 +3,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/config/api_config.dart';
+import 'token_storage.dart';
+
+
+import 'token_storage.dart';
 
 class ApiService {
   late final Dio _dio;
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   
   ApiService() {
     _dio = Dio(
@@ -42,7 +45,7 @@ class ApiService {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           // Récupérer le token depuis FlutterSecureStorage
-          final token = await _storage.read(key: 'auth_token');
+        final token = await TokenStorage.getToken();
           
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -200,16 +203,17 @@ class ApiService {
   }
   
   // Sauvegarder le token
-  Future<void> setAuthToken(String token) async {
-    await _storage.write(key: 'auth_token', value: token);
-    print('💾 Token saved in storage');
-  }
-  
-  // Supprimer le token
-  Future<void> removeAuthToken() async {
-    await _storage.delete(key: 'auth_token');
-    print('🗑️ Token removed from storage');
-  }
+ // ✅ GARDE CETTE MÉTHODE
+Future<void> setAuthToken(String token) async {
+  await TokenStorage.saveToken(token);
+  print('💾 Token saved in storage');
+}
+
+// ✅ GARDE CETTE MÉTHODE
+Future<void> removeAuthToken() async {
+  await TokenStorage.deleteToken();
+  print('🗑️ Token removed from storage');
+}
   
   void dispose() {
     _dio.close();

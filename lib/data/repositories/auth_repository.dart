@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/api_service.dart';
 import '../models/user_model.dart';
+import '../services/token_storage.dart';
+
 
 class AuthRepository {
   final ApiService _apiService;
@@ -120,11 +122,43 @@ class AuthRepository {
     }
   }
 
-  // Déconnexion
+  // ✅ DÉCONNEXION CORRIGÉE AVEC GESTION D'ERREUR
   Future<void> logout() async {
-    await deleteToken();
-    await _googleSignIn.signOut();
-    _apiService.removeAuthToken();
+    try {
+      print('🔓 AuthRepository: Déconnexion...');
+      
+      // 1. Supprimer le token local (PRIORITAIRE)
+      await deleteToken();
+      print('✅ Token local supprimé');
+      
+      // 2. Nettoyer ApiService
+      _apiService.removeAuthToken();
+      print('✅ Token ApiService supprimé');
+      
+      // 3. Tenter de déconnecter Google (si connecté)
+      try {
+        final isSignedIn = await _googleSignIn.isSignedIn();
+        if (isSignedIn) {
+          print('🔓 Déconnexion de Google...');
+          await _googleSignIn.signOut();
+          print('✅ Déconnexion Google réussie');
+        }
+      } catch (googleError) {
+        // ✅ IGNORER L'ERREUR GOOGLE SIGN-IN
+        print('⚠️ Impossible de déconnecter Google (ignoré): $googleError');
+        // Ne pas bloquer la déconnexion si Google échoue
+      }
+      
+      print('✅ AuthRepository: Déconnexion complète');
+    } catch (e) {
+      print('❌ AuthRepository: Erreur critique lors de la déconnexion: $e');
+      // Même en cas d'erreur, forcer la suppression du token
+      try {
+        await deleteToken();
+        _apiService.removeAuthToken();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   // Gestion du token
@@ -142,7 +176,6 @@ class AuthRepository {
   }
 
   Future<bool> isAuthenticated() async {
-    final token = await getToken();
-    return token != null;
-  }
+  return await TokenStorage.hasToken();
+}
 }

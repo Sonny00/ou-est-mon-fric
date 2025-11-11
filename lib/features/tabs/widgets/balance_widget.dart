@@ -20,12 +20,12 @@ class BalanceWidget extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: AppStyles.elevatedCard(),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,  // ← CENTRÉ
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Label centré
-          Text(
+          const Text(
             'Balance totale',
-            textAlign: TextAlign.center,  // ← CENTRÉ
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
@@ -36,29 +36,29 @@ class BalanceWidget extends StatelessWidget {
           
           const SizedBox(height: 12),
           
-          // Montant centré
+          // Montant centré avec couleur dynamique
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,  // ← CENTRÉ
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 '${balance >= 0 ? "+" : "−"}${balance.abs().toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 44,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: isPositive ? AppColors.success : AppColors.error, // ← Couleur dynamique
                   letterSpacing: -1.5,
                   height: 1,
                 ),
               ),
               const SizedBox(width: 4),
-              const Text(
+              Text(
                 '€',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
+                  color: isPositive ? AppColors.success : AppColors.error, // ← Couleur dynamique
                   letterSpacing: -0.5,
                 ),
               ),
@@ -67,21 +67,38 @@ class BalanceWidget extends StatelessWidget {
           
           const SizedBox(height: 16),
           
-           
+          // Badge avec meilleure distinction
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isPositive ? AppColors.accent : AppColors.surfaceLight,
+              color: isPositive 
+                  ? AppColors.success.withOpacity(0.15)  // ← Vert clair pour créditeur
+                  : AppColors.error.withOpacity(0.15),   // ← Rouge clair pour débiteur
               borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              isPositive ? 'Créditeur' : 'Débiteur',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isPositive ? AppColors.background : AppColors.textPrimary,
-                letterSpacing: -0.2,
+              border: Border.all(
+                color: isPositive ? AppColors.success : AppColors.error, // ← Bordure colorée
+                width: 1,
               ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isPositive ? Icons.trending_up : Icons.trending_down,
+                  size: 16,
+                  color: isPositive ? AppColors.success : AppColors.error,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isPositive ? 'Créditeur' : 'Débiteur',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isPositive ? AppColors.success : AppColors.error, // ← Texte coloré
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

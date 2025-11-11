@@ -9,7 +9,9 @@ import '../widgets/tab_card.dart';
 import '../widgets/balance_widget.dart';
 import '../providers/tabs_provider.dart';
 import 'create_tab_screen.dart';
-import 'edit_tab_screen.dart'; // ← AJOUTER cet import
+import 'edit_tab_screen.dart'; 
+import '../../auth/providers/auth_provider.dart'; 
+
 
 class TabsListScreen extends ConsumerStatefulWidget {
   const TabsListScreen({Key? key}) : super(key: key);
@@ -24,6 +26,8 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
   @override
   Widget build(BuildContext context) {
     final tabsAsync = ref.watch(tabsProvider);
+    final currentUser = ref.watch(authStateProvider).value; 
+    final currentUserId = currentUser?.id ?? '';
     
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -140,7 +144,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                           itemBuilder: (context, index) {
                             return TabCard(
                               tab: filteredTabs[index],
-                              currentUserId: 'current_user',
+                              currentUserId: currentUserId,
                               onTap: () => _showTabDetails(filteredTabs[index]), // ← MODIFIER cette ligne
                             );
                           },
@@ -250,6 +254,8 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
 
   // ========== AJOUTER CETTE FONCTION ==========
   void _showTabDetails(TabModel tab) {
+  final currentUser = ref.read(authStateProvider).value;  // ✅ AJOUTER
+  final currentUserId = currentUser?.id ?? '';  
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -289,14 +295,14 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: tab.iOwe('current_user') 
+                        color: tab.iOwe(currentUserId) 
                             ? AppColors.error.withOpacity(0.1)
                             : AppColors.success.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        tab.iOwe('current_user') ? Iconsax.arrow_up : Iconsax.arrow_down,
-                        color: tab.iOwe('current_user') ? AppColors.error : AppColors.success,
+                        tab.iOwe(currentUserId) ? Iconsax.arrow_up : Iconsax.arrow_down,
+                        color: tab.iOwe(currentUserId) ? AppColors.error : AppColors.success,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -305,7 +311,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            tab.iOwe('current_user') 
+                            tab.iOwe(currentUserId) 
                                 ? 'Tu dois à ${tab.creditorName}'
                                 : '${tab.debtorName} te doit',
                             style: const TextStyle(
@@ -320,7 +326,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w700,
-                              color: tab.iOwe('current_user') ? AppColors.error : AppColors.success,
+                              color: tab.iOwe(currentUserId) ? AppColors.error : AppColors.success,
                             ),
                           ),
                         ],
@@ -474,7 +480,6 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
     );
   }
 
-  // ========== AJOUTER CETTE FONCTION ==========
   void _showDeleteConfirmation(TabModel tab) {
     showDialog(
       context: context,
@@ -534,43 +539,66 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
   }
   // =========================================
   
-  List<TabModel> _getFilteredTabs(List<TabModel> tabs) {
-    if (_selectedFilter == 'all') {
-      return tabs.where((tab) => tab.status != TabStatus.settled).toList();
-    } else if (_selectedFilter == 'they_owe') {
-      return tabs.where((tab) => 
-        !tab.iOwe('current_user') && tab.status != TabStatus.settled
-      ).toList();
-    } else {
-      return tabs.where((tab) => 
-        tab.iOwe('current_user') && tab.status != TabStatus.settled
-      ).toList();
-    }
+ List<TabModel> _getFilteredTabs(List<TabModel> tabs) {
+  final currentUser = ref.read(authStateProvider).value;
+  final currentUserId = currentUser?.id ?? '';
+  
+  if (_selectedFilter == 'all') {
+    return tabs.where((tab) => tab.status != TabStatus.settled).toList();
+  } else if (_selectedFilter == 'they_owe') {
+    return tabs.where((tab) => 
+      !tab.iOwe(currentUserId) && tab.status != TabStatus.settled
+    ).toList();
+  } else {
+    return tabs.where((tab) => 
+      tab.iOwe(currentUserId) && tab.status != TabStatus.settled
+    ).toList();
   }
+}
   
   int _countByType(List<TabModel> tabs, bool theyOwe) {
-    return tabs.where((tab) {
-      if (theyOwe) {
-        return !tab.iOwe('current_user') && tab.status != TabStatus.settled;
-      } else {
-        return tab.iOwe('current_user') && tab.status != TabStatus.settled;
-      }
-    }).length;
+  final currentUser = ref.read(authStateProvider).value;
+  final currentUserId = currentUser?.id ?? '';
+  
+  return tabs.where((tab) {
+    if (theyOwe) {
+      return !tab.iOwe(currentUserId) && tab.status != TabStatus.settled;
+    } else {
+      return tab.iOwe(currentUserId) && tab.status != TabStatus.settled;
+    }
+  }).length;
+}
+  
+double _calculateBalance(List<TabModel> tabs) {
+  final currentUser = ref.read(authStateProvider).value;
+  final currentUserId = currentUser?.id ?? '';
+  
+  double total = 0;
+  print('🔍 === CALCUL DE LA BALANCE ===');
+  
+  for (var tab in tabs) {
+    if (tab.status == TabStatus.settled) continue;
+    
+    print('📋 Tab: ${tab.description}');
+    print('   Creditor: ${tab.creditorName} (${tab.creditorId})');
+    print('   Debtor: ${tab.debtorName} (${tab.debtorId})');
+    print('   Amount: ${tab.amount}€');
+    print('   iOwe result: ${tab.iOwe(currentUserId)}');  // ✅ CORRIGÉ
+    
+    if (tab.iOwe(currentUserId)) {  // ✅ CORRIGÉ
+      print('   ➖ JE DOIS: -${tab.amount}€');
+      total -= tab.amount;
+    } else {
+      print('   ➕ ON ME DOIT: +${tab.amount}€');
+      total += tab.amount;
+    }
+    print('   Balance courante: $total€');
   }
   
-  double _calculateBalance(List<TabModel> tabs) {
-    double total = 0;
-    for (var tab in tabs) {
-      if (tab.status == TabStatus.settled) continue;
-      
-      if (tab.iOwe('current_user')) {
-        total -= tab.amount;
-      } else {
-        total += tab.amount;
-      }
-    }
-    return total;
-  }
+  print('💰 BALANCE FINALE: $total€');
+  print('============================');
+  return total;
+}
 }
 
 class _FilterChip extends StatelessWidget {

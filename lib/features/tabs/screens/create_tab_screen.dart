@@ -6,6 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/friend_model.dart';
 import '../providers/tabs_provider.dart';
 import '../../friends/providers/friends_provider.dart';
+import '../../auth/providers/auth_provider.dart'; // ← AJOUTER
+
 
 class CreateTabScreen extends ConsumerStatefulWidget {
   final Friend? preSelectedFriend;
@@ -562,63 +564,79 @@ class _CreateTabScreenState extends ConsumerState<CreateTabScreen> {
       setState(() => _imagePath = image.path);
     }
   }
+Future<void> _handleCreateTab() async {
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
 
-  Future<void> _handleCreateTab() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  if (_selectedFriend == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Veuillez sélectionner un ami'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+    return;
+  }
+   
+  final currentUser = ref.read(authStateProvider).value; // ← AJOUTER
+  final currentUserId = currentUser?.id ?? '';
 
-    if (_selectedFriend == null) {
+  setState(() => _isLoading = true);
+
+  try {
+    final amount = double.parse(_amountController.text);
+    
+    print('🎯 === CRÉATION DE TAB ===');
+    print('_iOwe (Je leur dois): $_iOwe');
+    print('Friend: ${_selectedFriend!.name}');
+    print('Amount: $amount€');
+    
+   final data = {
+  'creditorId': _iOwe ? _selectedFriend!.id : currentUserId,
+  'creditorName': _iOwe ? _selectedFriend!.name : 'Moi',
+  'debtorId': _iOwe ? currentUserId : _selectedFriend!.id,
+  'debtorName': _iOwe ? 'Moi' : _selectedFriend!.name,
+  'amount': amount,
+  'description': _descriptionController.text,
+  if (_imagePath != null) 'proofImageUrl': _imagePath,
+};
+
+    print('📤 Data envoyée:');
+    print('   creditorId: ${data['creditorId']}');
+    print('   creditorName: ${data['creditorName']}');
+    print('   debtorId: ${data['debtorId']}');
+    print('   debtorName: ${data['debtorName']}');
+    print('   amount: ${data['amount']}');
+    print('========================');
+
+    await ref.read(tabsNotifierProvider.notifier).createTab(data);
+
+    if (mounted) {
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez sélectionner un ami'),
+          content: Text('Tab créée avec succès !'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
+  } catch (e) {
+    print('❌ Erreur création tab: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
           backgroundColor: AppColors.error,
         ),
       );
-      return;
     }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final amount = double.parse(_amountController.text);
-      
-      final data = {
-        'creditorId': _iOwe ? _selectedFriend!.id : 'current_user',
-        'creditorName': _iOwe ? _selectedFriend!.name : 'Moi',
-        'debtorId': _iOwe ? 'current_user' : _selectedFriend!.id,
-        'debtorName': _iOwe ? 'Moi' : _selectedFriend!.name,
-        'amount': amount,
-        'description': _descriptionController.text,
-        if (_imagePath != null) 'proofImageUrl': _imagePath,
-      };
-
-      await ref.read(tabsNotifierProvider.notifier).createTab(data);
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tab créée avec succès !'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
+}
 }
 
 class _ToggleOption extends StatelessWidget {
