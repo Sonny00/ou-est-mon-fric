@@ -252,7 +252,6 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
     );
   }
 
-  // ========== AJOUTER CETTE FONCTION ==========
   void _showTabDetails(TabModel tab) {
   final currentUser = ref.read(authStateProvider).value;  // ✅ AJOUTER
   final currentUserId = currentUser?.id ?? '';  

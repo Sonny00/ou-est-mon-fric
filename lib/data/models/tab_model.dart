@@ -57,7 +57,6 @@ class TabModel {
     return debtorId == currentUserId && status == TabStatus.confirmed;
   }
 
-  // ========== AJOUTER CES GETTERS ==========
   bool get hasDeadline => repaymentDeadline != null;
 
   bool get isOverdue {
@@ -102,12 +101,10 @@ class TabModel {
           ? DateTime.parse(json['settledAt'])
           : null,
       disputeReason: json['disputeReason'],
-      // ========== AJOUTER CES LIGNES ==========
       repaymentDeadline: json['repaymentDeadline'] != null
           ? DateTime.parse(json['repaymentDeadline'])
           : null,
       deadlineNotificationSent: json['deadlineNotificationSent'] ?? false,
-      // ========================================
     );
   }
 
@@ -134,7 +131,6 @@ class TabModel {
       'repaymentRequestedAt': repaymentRequestedAt?.toIso8601String(),
       'settledAt': settledAt?.toIso8601String(),
       'disputeReason': disputeReason,
-      // ========== AJOUTER CES LIGNES ==========
       'repaymentDeadline': repaymentDeadline?.toIso8601String(),
       'deadlineNotificationSent': deadlineNotificationSent,
       // ========================================

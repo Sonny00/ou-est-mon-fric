@@ -24,7 +24,6 @@ export class FriendEntity {
   @CreateDateColumn()
   addedAt: Date;
 
-  // ✅ AJOUTER LES RELATIONS AVEC CASCADE
   @OneToMany(() => TabEntity, (tab) => tab.debtor, {
     cascade: true,
     onDelete: 'CASCADE',

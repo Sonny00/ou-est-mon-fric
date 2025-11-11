@@ -90,22 +90,22 @@ class TabCard extends StatelessWidget {
                 ),
                 
                 // Montant
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${isIOwing ? "−" : "+"}${tab.amount.toStringAsFixed(0)}€',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _StatusIndicator(status: tab.status),
-                  ],
-                ),
+          Column(
+  crossAxisAlignment: CrossAxisAlignment.end,
+  children: [
+    Text(
+      '${isIOwing ? "−" : "+"}${tab.amount.toStringAsFixed(0)}€',
+      style: TextStyle(  // ← Changer de const à TextStyle normal
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: isIOwing ? AppColors.error : AppColors.success,  // ← Couleur dynamique
+        letterSpacing: -0.8,
+      ),
+    ),
+    const SizedBox(height: 4),
+    _StatusIndicator(status: tab.status),
+  ],
+),
               ],
             ),
             

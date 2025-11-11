@@ -31,9 +31,7 @@ export class CreateTabDto {
   @IsOptional()
   proofImageUrl?: string;
 
-  // ========== AJOUTER CETTE LIGNE ==========
   @IsDateString()
   @IsOptional()
   repaymentDeadline?: string;
-  // =========================================
 }
