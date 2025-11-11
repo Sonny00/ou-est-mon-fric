@@ -1,11 +1,12 @@
 // lib/data/services/api_service.dart
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/config/api_config.dart';
-import 'token_storage.dart'; // ← AJOUTER CET IMPORT
 
 class ApiService {
   late final Dio _dio;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   
   ApiService() {
     _dio = Dio(
@@ -31,7 +32,7 @@ class ApiService {
         requestBody: true,
         responseBody: true,
         error: true,
-        requestHeader: false,
+        requestHeader: true,
         responseHeader: false,
       ),
     );
@@ -39,33 +40,29 @@ class ApiService {
     // 2. Auth interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) async { // ← AJOUTER async
-          // Add auth token if exists
-          final token = await TokenStorage.getToken(); // ← MODIFIER CETTE LIGNE
+        onRequest: (options, handler) async {
+          // Récupérer le token depuis FlutterSecureStorage
+          final token = await _storage.read(key: 'auth_token');
+          
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
-            print('🔐 Token added to ${options.path}'); // Debug
+            print('🔐 Token added to ${options.path}');
           } else {
-            print('⚠️ No token for ${options.path}'); // Debug
+            print('⚠️ No token available for ${options.path}');
           }
+          
           return handler.next(options);
         },
         onError: (error, handler) {
           // Auto-logout on 401
           if (error.response?.statusCode == 401) {
-            print('❌ 401 Unauthorized - Token may be invalid'); // Debug
-            // TODO: Navigate to login screen
+            print('❌ 401 Unauthorized - Token may be invalid');
           }
           return handler.next(error);
         },
       ),
     );
   }
-  
-  // ← SUPPRIMER CETTE FONCTION (plus besoin)
-  // String? _getStoredToken() {
-  //   return null;
-  // }
   
   // GET
   Future<Map<String, dynamic>> get(
@@ -202,15 +199,16 @@ class ApiService {
     }
   }
   
-  // Méthodes utilitaires (garder)
+  // Sauvegarder le token
   Future<void> setAuthToken(String token) async {
-    await TokenStorage.saveToken(token); // ← MODIFIER
-    print('💾 Token saved via setAuthToken'); // Debug
+    await _storage.write(key: 'auth_token', value: token);
+    print('💾 Token saved in storage');
   }
   
+  // Supprimer le token
   Future<void> removeAuthToken() async {
-    await TokenStorage.deleteToken(); // ← MODIFIER
-    print('🗑️ Token removed'); // Debug
+    await _storage.delete(key: 'auth_token');
+    print('🗑️ Token removed from storage');
   }
   
   void dispose() {

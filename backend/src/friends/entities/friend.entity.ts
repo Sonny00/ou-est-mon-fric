@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
+import { TabEntity } from '../../tabs/entities/tab.entity'; // ← Importer TabEntity
 
 @Entity('friends')
 export class FriendEntity {
@@ -22,4 +23,17 @@ export class FriendEntity {
 
   @CreateDateColumn()
   addedAt: Date;
+
+  // ✅ AJOUTER LES RELATIONS AVEC CASCADE
+  @OneToMany(() => TabEntity, (tab) => tab.debtor, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
+  tabsAsDebtor: TabEntity[];
+
+  @OneToMany(() => TabEntity, (tab) => tab.creditor, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
+  tabsAsCreditor: TabEntity[];
 }

@@ -8,7 +8,12 @@ import '../providers/tabs_provider.dart';
 import '../../friends/providers/friends_provider.dart';
 
 class CreateTabScreen extends ConsumerStatefulWidget {
-  const CreateTabScreen({Key? key}) : super(key: key);
+  final Friend? preSelectedFriend;
+
+ const CreateTabScreen({
+    Key? key,
+    this.preSelectedFriend, 
+  }) : super(key: key);
 
   @override
   ConsumerState<CreateTabScreen> createState() => _CreateTabScreenState();
@@ -20,9 +25,16 @@ class _CreateTabScreenState extends ConsumerState<CreateTabScreen> {
   final _descriptionController = TextEditingController();
   
   Friend? _selectedFriend;
-  bool _iOwe = false; // false = ils me doivent, true = je leur dois
+  bool _iOwe = false; 
   String? _imagePath;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedFriend = widget.preSelectedFriend;
+  }
+
 
   @override
   void dispose() {

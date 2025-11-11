@@ -6,7 +6,10 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { FriendEntity } from '../../friends/entities/friend.entity';
 
 export enum TabStatus {
   PENDING = 'pending',
@@ -31,6 +34,20 @@ export class TabEntity {
 
   @Column()
   debtorName: string;
+
+  // ✅ AJOUTER LES RELATIONS ICI
+  @ManyToOne(() => FriendEntity, (friend) => friend.tabsAsCreditor, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'creditorId' })
+  creditor: FriendEntity;
+
+  @ManyToOne(() => FriendEntity, (friend) => friend.tabsAsDebtor, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'debtorId' })
+  debtor: FriendEntity;
+  // ✅ FIN DES RELATIONS
 
   @Column('decimal', {
     precision: 10,

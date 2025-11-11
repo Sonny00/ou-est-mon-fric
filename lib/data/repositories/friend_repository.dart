@@ -8,7 +8,6 @@ class FriendRepository {
   
   FriendRepository(this._apiService);
   
-  // Récupérer tous les amis
   Future<List<Friend>> getFriends() async {
     try {
       final response = await _apiService.get('/friends');
@@ -24,7 +23,6 @@ class FriendRepository {
     }
   }
   
-  // Ajouter un ami
   Future<Friend> addFriend(Map<String, dynamic> data) async {
     try {
       final response = await _apiService.post('/friends', data: data);
@@ -39,16 +37,27 @@ class FriendRepository {
     }
   }
   
-  // Supprimer un ami
+  // ← CORRIGER CETTE MÉTHODE
   Future<void> deleteFriend(String id) async {
     try {
-      await _apiService.delete('/friends/$id');
+      print('🗑️ Repository: Tentative de suppression de $id');
+      
+      final response = await _apiService.delete('/friends/$id');
+      
+      print('📡 Réponse API: $response');
+      
+      // VÉRIFIER LA RÉPONSE
+      if (response['success'] != true) {
+        throw Exception('La suppression a échoué: ${response['message'] ?? 'Erreur inconnue'}');
+      }
+      
+      print('✅ Repository: Ami supprimé avec succès');
     } catch (e) {
+      print('❌ Repository: Erreur lors de la suppression: $e');
       throw Exception('Impossible de supprimer l\'ami: $e');
     }
   }
   
-  // Modifier un ami
   Future<Friend> updateFriend(String id, Map<String, dynamic> data) async {
     try {
       final response = await _apiService.patch('/friends/$id', data: data);

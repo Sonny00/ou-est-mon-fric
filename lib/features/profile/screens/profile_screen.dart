@@ -214,68 +214,86 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
   
-  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text(
-          'Déconnexion',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: const Text(
-          'Êtes-vous sûr de vouloir vous déconnecter ?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Annuler',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                // Déconnexion
-                await ref.read(authStateProvider.notifier).logout();
-                
-                if (context.mounted) {
-                  Navigator.pop(context); // Fermer le dialog
-                  
-                  // Rediriger vers login
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                    (route) => false,
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur: $e'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text(
-              'Déconnexion',
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
-        ],
+void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-    );
-  }
+      title: const Text(
+        'Déconnexion',
+        style: TextStyle(color: AppColors.textPrimary),
+      ),
+      content: const Text(
+        'Êtes-vous sûr de vouloir vous déconnecter ?',
+        style: TextStyle(color: AppColors.textSecondary),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Annuler',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+        TextButton(
+          onPressed: () async {
+            try {
+              // Fermer le dialog immédiatement
+              Navigator.pop(context);
+              
+              // Afficher un loader
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                ),
+              );
+              
+              // Déconnexion
+              await ref.read(authStateProvider.notifier).logout();
+              
+              if (context.mounted) {
+                // Fermer le loader
+                Navigator.pop(context);
+                
+                // Rediriger vers login
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const LoginScreen(),
+                  ),
+                  (route) => false,
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                // Fermer le loader si erreur
+                Navigator.pop(context);
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur: $e'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            }
+          },
+          child: const Text(
+            'Déconnexion',
+            style: TextStyle(
+              color: AppColors.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }
 
 class _StatCard extends StatelessWidget {

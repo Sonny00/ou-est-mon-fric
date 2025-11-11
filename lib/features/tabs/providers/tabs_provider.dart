@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/tab_model.dart';
 import '../../../data/repositories/tab_repository.dart';
 import '../../../data/services/api_service.dart';
+import '../../activity/providers/activity_provider.dart'; // ← AJOUTER CET IMPORT
 
 // Provider pour ApiService (singleton)
 final apiServiceProvider = Provider<ApiService>((ref) {
@@ -42,6 +43,7 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.createTab(data);
       _ref.invalidate(tabsProvider);
+      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -53,6 +55,7 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.updateTab(id, data);
       _ref.invalidate(tabsProvider);
+      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -64,6 +67,7 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.deleteTab(id);
       _ref.invalidate(tabsProvider);
+      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -75,6 +79,7 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.confirmTab(id);
       _ref.invalidate(tabsProvider);
+      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -86,6 +91,7 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.requestRepayment(id, proofImageUrl: proofImageUrl);
       _ref.invalidate(tabsProvider);
+      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -97,6 +103,7 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.confirmRepayment(id);
       _ref.invalidate(tabsProvider);
+      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
