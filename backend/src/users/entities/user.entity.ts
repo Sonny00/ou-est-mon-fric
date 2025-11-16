@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index, // ⭐ AJOUTER
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 
@@ -36,6 +37,11 @@ export class User {
 
   @Column({ default: false })
   isEmailVerified: boolean;
+
+  // ⭐ NOUVEAU : Tag unique
+  @Column({ unique: true, nullable: true })
+  @Index() // Pour optimiser les recherches
+  tag: string; // Ex: "Sonny#7842"
 
   @CreateDateColumn()
   createdAt: Date;

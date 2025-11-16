@@ -2,14 +2,19 @@
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FriendsService } from './friends.service';
 import { FriendsController } from './friends.controller';
+import { FriendsService } from './friends.service';
 import { FriendEntity } from './entities/friend.entity';
-import { TabEntity } from '../tabs/entities/tab.entity'; // ← Import
+import { TabEntity } from '../tabs/entities/tab.entity';
+import { User } from '../users/entities/user.entity'; // ⭐ AJOUTER CET IMPORT
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FriendEntity, TabEntity]), // ← Ajouter TabEntity
+    TypeOrmModule.forFeature([
+      FriendEntity,
+      TabEntity,
+      User, // ⭐ AJOUTER CETTE LIGNE
+    ]),
   ],
   controllers: [FriendsController],
   providers: [FriendsService],

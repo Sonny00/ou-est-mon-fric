@@ -8,6 +8,8 @@ class FriendRepository {
   
   FriendRepository(this._apiService);
   
+  // ========== MÉTHODES EXISTANTES ==========
+  
   Future<List<Friend>> getFriends() async {
     try {
       final response = await _apiService.get('/friends');
@@ -23,7 +25,7 @@ class FriendRepository {
     }
   }
   
-  Future<Friend> addFriend(Map<String, dynamic> data) async {
+  Future<Friend> createFriend(Map<String, dynamic> data) async {
     try {
       final response = await _apiService.post('/friends', data: data);
       
@@ -33,28 +35,7 @@ class FriendRepository {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      throw Exception('Impossible d\'ajouter l\'ami: $e');
-    }
-  }
-  
-  // ← CORRIGER CETTE MÉTHODE
-  Future<void> deleteFriend(String id) async {
-    try {
-      print('🗑️ Repository: Tentative de suppression de $id');
-      
-      final response = await _apiService.delete('/friends/$id');
-      
-      print('📡 Réponse API: $response');
-      
-      // VÉRIFIER LA RÉPONSE
-      if (response['success'] != true) {
-        throw Exception('La suppression a échoué: ${response['message'] ?? 'Erreur inconnue'}');
-      }
-      
-      print('✅ Repository: Ami supprimé avec succès');
-    } catch (e) {
-      print('❌ Repository: Erreur lors de la suppression: $e');
-      throw Exception('Impossible de supprimer l\'ami: $e');
+      throw Exception('Impossible de créer l\'ami: $e');
     }
   }
   
@@ -69,6 +50,96 @@ class FriendRepository {
       }
     } catch (e) {
       throw Exception('Impossible de modifier l\'ami: $e');
+    }
+  }
+  
+  Future<void> deleteFriend(String id) async {
+    try {
+      await _apiService.delete('/friends/$id');
+    } catch (e) {
+      throw Exception('Impossible de supprimer l\'ami: $e');
+    }
+  }
+  
+  // ========== ⭐ NOUVELLES MÉTHODES POUR AMIS VÉRIFIÉS ==========
+  
+  /// Envoyer une invitation d'ami vérifié par TAG
+  Future<Map<String, dynamic>> sendFriendRequestByTag(String tag) async {
+    try {
+      final response = await _apiService.post(
+        '/friends/requests/send',
+        data: {'tag': tag}, // ⭐ Changé de "email" à "tag"
+      );
+      
+      if (response['success'] == true) {
+        return response['data'];
+      } else {
+        throw Exception('API returned success: false');
+      }
+    } catch (e) {
+      throw Exception('Impossible d\'envoyer l\'invitation: $e');
+    }
+  }
+  
+  /// Récupérer les invitations reçues
+  Future<List<Friend>> getReceivedRequests() async {
+    try {
+      final response = await _apiService.get('/friends/requests/received');
+      
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'];
+        return data.map((json) => Friend.fromJson(json)).toList();
+      } else {
+        throw Exception('API returned success: false');
+      }
+    } catch (e) {
+      throw Exception('Impossible de charger les invitations: $e');
+    }
+  }
+  
+  /// Récupérer les invitations envoyées
+  Future<List<Friend>> getSentRequests() async {
+    try {
+      final response = await _apiService.get('/friends/requests/sent');
+      
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'];
+        return data.map((json) => Friend.fromJson(json)).toList();
+      } else {
+        throw Exception('API returned success: false');
+      }
+    } catch (e) {
+      throw Exception('Impossible de charger les invitations: $e');
+    }
+  }
+  
+  /// Accepter ou refuser une invitation
+  Future<Friend?> respondToRequest(String friendId, String response) async {
+    try {
+      final result = await _apiService.post(
+        '/friends/requests/$friendId/respond',
+        data: {'response': response}, // "accept" ou "reject"
+      );
+      
+      if (result['success'] == true) {
+        if (result['data'] != null) {
+          return Friend.fromJson(result['data']);
+        }
+        return null; // Cas du refus
+      } else {
+        throw Exception('API returned success: false');
+      }
+    } catch (e) {
+      throw Exception('Impossible de répondre à l\'invitation: $e');
+    }
+  }
+  
+  /// Annuler une invitation envoyée
+  Future<void> cancelRequest(String friendId) async {
+    try {
+      await _apiService.delete('/friends/requests/$friendId/cancel');
+    } catch (e) {
+      throw Exception('Impossible d\'annuler l\'invitation: $e');
     }
   }
 }

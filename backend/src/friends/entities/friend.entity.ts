@@ -7,8 +7,15 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+
+export enum FriendStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  BLOCKED = 'blocked',
+}
 
 @Entity('friends')
 export class FriendEntity {
@@ -22,15 +29,15 @@ export class FriendEntity {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  // ========== RENDRE NULLABLE ==========
-  @Column('uuid', { nullable: true }) // ← AJOUTER nullable: true
+  // ⭐ Ami vérifié (a un compte)
+  @Column('uuid', { nullable: true })
   friendUserId: string | null;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'friendUserId' })
   friendUser: User | null;
-  // ====================================
 
+  // ⭐ Ami non-vérifié (pas de compte)
   @Column()
   name: string;
 
@@ -43,6 +50,21 @@ export class FriendEntity {
   @Column({ nullable: true })
   avatarUrl: string;
 
+  // ⭐ NOUVEAU : Statut de la relation
+  @Column({
+    type: 'enum',
+    enum: FriendStatus,
+    default: FriendStatus.ACCEPTED,
+  })
+  status: FriendStatus;
+
+  // ⭐ NOUVEAU : Type d'ami
+  @Column({ default: false })
+  isVerified: boolean;
+
   @CreateDateColumn()
   addedAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

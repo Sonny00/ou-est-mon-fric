@@ -6,8 +6,9 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/friend_model.dart';
 import '../providers/friends_provider.dart';
-import '../../../data/repositories/friend_repository.dart';
 import '../../tabs/screens/create_tab_screen.dart';
+import 'add_friend_screen.dart';
+import 'friend_requests_screen.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({Key? key}) : super(key: key);
@@ -31,7 +32,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final friendsAsync = ref.watch(friendsNotifierProvider);
+    final friendsAsync = ref.watch(friendsProvider);
+    
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -65,6 +67,61 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               )
             : const Text('Mes Amis'),
         actions: [
+          // ⭐ NOUVEAU : Badge invitations
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Iconsax.notification),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FriendRequestsScreen(),
+                    ),
+                  );
+                },
+              ),
+              // Badge rouge avec le nombre
+              Consumer(
+                builder: (context, ref, child) {
+                  final requests = ref.watch(receivedRequestsProvider);
+                  return requests.when(
+                    data: (requests) {
+                      if (requests.isEmpty) return const SizedBox();
+                      return Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            requests.length.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox(),
+                    error: (_, __) => const SizedBox(),
+                  );
+                },
+              ),
+            ],
+          ),
+          
+          // Bouton recherche
           IconButton(
             icon: Icon(_isSearching ? Iconsax.close_square : Iconsax.search_normal),
             onPressed: () {
@@ -103,7 +160,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () => ref.read(friendsNotifierProvider.notifier).loadFriends(),
+                onPressed: () => ref.invalidate(friendsProvider),
                 icon: const Icon(Iconsax.refresh),
                 label: const Text('Réessayer'),
                 style: ElevatedButton.styleFrom(
@@ -170,7 +227,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                 child: RefreshIndicator(
                   color: AppColors.accent,
                   onRefresh: () async {
-                    await ref.read(friendsNotifierProvider.notifier).loadFriends();
+                    ref.invalidate(friendsProvider);
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -179,7 +236,6 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                       return _FriendCard(
                         friend: filteredFriends[index],
                         searchQuery: _searchQuery,
-                        // ✅ CORRECTION ICI - Crée une closure sans paramètres
                         onTap: () {
                           _showFriendDetails(context, filteredFriends[index], ref);
                         },
@@ -209,7 +265,14 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => _showAddFriendDialog(context, ref),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddFriendScreen(),
+                      ),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(16),
                   child: const SizedBox(
                     width: 56,
@@ -222,267 +285,136 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     );
   }
   
-  
-  
   void _showFriendDetails(BuildContext context, Friend friend, WidgetRef ref) {
-  print('🔵 _showFriendDetails appelée pour ${friend.name}');
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (modalContext) => Container(  // ← Utilise modalContext au lieu de context
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-            child: Center(
-              child: Text(
-                friend.initials,
-                style: const TextStyle(
-                  color: AppColors.background,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            friend.name,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 8),
-          if (friend.phoneNumber != null)
-            Text(
-              friend.phoneNumber!,
-              style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
-            ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  label: 'Créer une tab',
-                  icon: Iconsax.add_circle,
-                  onTap: () {
-                    Navigator.pop(modalContext);  // ← modalContext
-                    Navigator.push(
-                      context,  // ← context parent pour la navigation
-                      MaterialPageRoute(
-                        builder: (context) => CreateTabScreen(preSelectedFriend: friend),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ActionButton(
-                  label: 'Supprimer',
-                  icon: Iconsax.trash,
-                  isDestructive: true,
-                  onTap: () => _handleDeleteFriend(modalContext, friend, ref, context),  // ← Passe les 2 contexts
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-  Future<void> _handleDeleteFriend(
-  BuildContext modalContext,  // ← Context de la bottom sheet
-  Friend friend, 
-  WidgetRef ref,
-  BuildContext parentContext,  // ← Context parent pour le SnackBar
-) async {
-  print('🔵 DÉBUT _handleDeleteFriend pour ${friend.id}');
-  Navigator.pop(modalContext);  // ← Ferme la bottom sheet avec son propre context
-  await Future.delayed(const Duration(milliseconds: 300));
-  
-  if (!parentContext.mounted) {
-    print('⚠️ Parent context non monté après délai');
-    return;
-  }
-  
-  final confirmed = await showDialog<bool>(
-    context: parentContext,  // ← Utilise le parent context pour le dialog
-    builder: (ctx) => AlertDialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Supprimer ?', style: TextStyle(color: AppColors.textPrimary)),
-      content: Text(
-        'Supprimer ${friend.name} ?',
-        style: const TextStyle(color: AppColors.textSecondary),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Non', style: TextStyle(color: AppColors.textSecondary)),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Oui', style: TextStyle(color: AppColors.error)),
-        ),
-      ],
-    ),
-  );
-
-  print('🔵 Confirmation: $confirmed');
-
-  if (confirmed != true || !parentContext.mounted) {
-    print('⚠️ Annulé ou context non monté');
-    return;
-  }
-
-  try {
-    print('🔥 APPEL deleteFriend(${friend.id})');
-    
-    await ref.read(friendsNotifierProvider.notifier).deleteFriend(friend.id);
-    
-    print('✅ deleteFriend terminé avec succès');
-    
-    if (parentContext.mounted) {
-      ScaffoldMessenger.of(parentContext).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Supprimé'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  } catch (e, stackTrace) {
-    print('❌ ERREUR CATCH: $e');
-    print('📍 StackTrace: $stackTrace');
-    if (parentContext.mounted) {
-      ScaffoldMessenger.of(parentContext).showSnackBar(
-        SnackBar(
-          content: Text('❌ Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-}
-
-  void _showAddFriendDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) {
-        bool isLoading = false;
-        return StatefulBuilder(
-          builder: (context, setState) => AlertDialog(
-            backgroundColor: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Ajouter un ami', style: TextStyle(color: AppColors.textPrimary)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: 'Nom',
-                    labelStyle: const TextStyle(color: AppColors.textSecondary),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.accent),
-                    ),
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+              child: Center(
+                child: Text(
+                  friend.initials,
+                  style: const TextStyle(
+                    color: AppColors.background,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: phoneController,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'Téléphone (optionnel)',
-                    labelStyle: const TextStyle(color: AppColors.textSecondary),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.accent),
-                    ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              friend.name,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            if (friend.phoneNumber != null)
+              Text(
+                friend.phoneNumber!,
+                style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
+              ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    label: 'Créer une tab',
+                    icon: Iconsax.add_circle,
+                    onTap: () {
+                      Navigator.pop(modalContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateTabScreen(preSelectedFriend: friend),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ActionButton(
+                    label: 'Supprimer',
+                    icon: Iconsax.trash,
+                    isDestructive: true,
+                    onTap: () => _handleDeleteFriend(modalContext, friend, ref, context),
                   ),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: isLoading ? null : () => Navigator.pop(context),
-                child: const Text('Annuler', style: TextStyle(color: AppColors.textSecondary)),
-              ),
-              TextButton(
-                onPressed: isLoading
-                    ? null
-                    : () async {
-                        if (nameController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Le nom est requis'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                          return;
-                        }
+          ],
+        ),
+      ),
+    );
+  }
 
-                        setState(() => isLoading = true);
+  Future<void> _handleDeleteFriend(
+    BuildContext modalContext,
+    Friend friend, 
+    WidgetRef ref,
+    BuildContext parentContext,
+  ) async {
+    Navigator.pop(modalContext);
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    if (!parentContext.mounted) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: parentContext,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Supprimer ?', style: TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          'Supprimer ${friend.name} ?',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Oui', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
 
-                        try {
-                          await ref.read(friendsNotifierProvider.notifier).addFriend({
-                            'name': nameController.text.trim(),
-                            if (phoneController.text.isNotEmpty)
-                              'phoneNumber': phoneController.text.trim(),
-                          });
+    if (confirmed != true || !parentContext.mounted) return;
 
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('${nameController.text} ajouté !'),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          setState(() => isLoading = false);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error),
-                            );
-                          }
-                        }
-                      },
-                child: isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
-                      )
-                    : const Text('Ajouter', style: TextStyle(color: AppColors.accent)),
-              ),
-            ],
+    try {
+      await ref.read(friendsNotifierProvider.notifier).deleteFriend(friend.id);
+      
+      if (parentContext.mounted) {
+        ScaffoldMessenger.of(parentContext).showSnackBar(
+          const SnackBar(
+            content: Text('Ami supprimé'),
+            backgroundColor: AppColors.success,
           ),
         );
-      },
-    );
+      }
+    } catch (e) {
+      if (parentContext.mounted) {
+        ScaffoldMessenger.of(parentContext).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }
 

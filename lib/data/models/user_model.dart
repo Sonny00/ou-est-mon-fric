@@ -7,6 +7,8 @@ class UserModel {
   final String? phoneNumber;
   final String? avatarUrl;
   final bool isEmailVerified;
+  final String? tag; // ⭐ NOUVEAU
+
 
   UserModel({
     required this.id,
@@ -15,6 +17,7 @@ class UserModel {
     this.phoneNumber,
     this.avatarUrl,
     required this.isEmailVerified,
+    this.tag,
   });
 
   String get initials {

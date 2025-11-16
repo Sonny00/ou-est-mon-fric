@@ -15,17 +15,21 @@ import {
 import { FriendsService } from './friends.service';
 import { CreateFriendDto } from './dto/create-friend.dto';
 import { UpdateFriendDto } from './dto/update-friend.dto';
+import { SendFriendRequestDto } from './dto/send-friend-request.dto'; // ⭐ AJOUTER
+import { RespondFriendRequestDto } from './dto/respond-friend-request.dto'; // ⭐ AJOUTER
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('friends')
-@UseGuards(JwtAuthGuard) // ← Protéger toutes les routes
+@UseGuards(JwtAuthGuard)
 export class FriendsController {
   constructor(private readonly friendsService: FriendsService) {}
 
+  // ========== ROUTES EXISTANTES (garder tel quel) ==========
+
   @Get()
   async findAll(@CurrentUser() user: any) {
-    console.log('👤 User:', user); // Debug
+    console.log('👤 User:', user);
     const data = await this.friendsService.findAllByUser(user.id);
     return {
       success: true,
@@ -75,6 +79,89 @@ export class FriendsController {
       success: true,
       data,
       message: 'Friend deleted successfully',
+    };
+  }
+
+  // ========== ⭐ NOUVELLES ROUTES POUR AMIS VÉRIFIÉS ==========
+
+  /**
+   * Envoyer une invitation d'ami vérifié
+   * POST /friends/requests/send
+   * Body: { email: "ami@example.com" }
+   */
+  @Post('requests/send')
+  @HttpCode(HttpStatus.CREATED)
+  async sendFriendRequest(
+    @Body() dto: SendFriendRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.friendsService.sendFriendRequest(user.id, dto);
+    return {
+      success: true,
+      data,
+      message: 'Friend request sent successfully',
+    };
+  }
+
+  /**
+   * Récupérer les invitations reçues
+   * GET /friends/requests/received
+   */
+  @Get('requests/received')
+  async getReceivedRequests(@CurrentUser() user: any) {
+    const data = await this.friendsService.getReceivedRequests(user.id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  /**
+   * Récupérer les invitations envoyées
+   * GET /friends/requests/sent
+   */
+  @Get('requests/sent')
+  async getSentRequests(@CurrentUser() user: any) {
+    const data = await this.friendsService.getSentRequests(user.id);
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  /**
+   * Accepter ou refuser une invitation
+   * POST /friends/requests/:id/respond
+   * Body: { response: "accept" | "reject" }
+   */
+  @Post('requests/:id/respond')
+  @HttpCode(HttpStatus.OK)
+  async respondToRequest(
+    @Param('id') id: string,
+    @Body() dto: RespondFriendRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.friendsService.respondToRequest(user.id, id, dto.response);
+    return {
+      success: true,
+      data,
+      message: dto.response === 'accept' 
+        ? 'Friend request accepted' 
+        : 'Friend request rejected',
+    };
+  }
+
+  /**
+   * Annuler une invitation envoyée
+   * DELETE /friends/requests/:id/cancel
+   */
+  @Delete('requests/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  async cancelRequest(@Param('id') id: string, @CurrentUser() user: any) {
+    await this.friendsService.cancelRequest(user.id, id);
+    return {
+      success: true,
+      message: 'Friend request cancelled successfully',
     };
   }
 }
