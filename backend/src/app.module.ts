@@ -7,6 +7,8 @@ import { AppController } from './app.controller';
 import { TabsModule } from './tabs/tabs.module';
 import { FriendsModule } from './friends/friends.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { use } from 'passport';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { AuthModule } from './auth/auth.module';
     TabsModule,
     FriendsModule,
     AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
 })

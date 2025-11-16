@@ -11,6 +11,7 @@ import '../providers/tabs_provider.dart';
 import 'create_tab_screen.dart';
 import 'edit_tab_screen.dart'; 
 import '../../auth/providers/auth_provider.dart'; 
+import '../../payments/screens/payments_screen.dart';
 
 
 class TabsListScreen extends ConsumerStatefulWidget {
@@ -31,9 +32,21 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
     
     return Scaffold(
       backgroundColor: AppColors.background,
+
       appBar: AppBar(
         title: const Text('OuEstMonFric'),
         actions: [
+           IconButton(
+            icon: const Icon(Iconsax.wallet_money, size: 22),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PaymentsScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Iconsax.notification, size: 22),
             onPressed: () {},
@@ -106,6 +119,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
+                mainAxisAlignment: MainAxisAlignment.center, 
                   children: [
                     _FilterChip(
                       label: 'Tout',
@@ -422,55 +436,100 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                 ],
 
                 // Actions
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(context);
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditTabScreen(tab: tab),
-                            ),
-                          );
-                          if (result == true) {
-                            ref.refresh(tabsProvider);
-                          }
-                        },
-                        icon: const Icon(Iconsax.edit, size: 18),
-                        label: const Text('Modifier'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.accent,
-                          side: const BorderSide(color: AppColors.accent),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showDeleteConfirmation(tab);
-                        },
-                        icon: const Icon(Iconsax.trash, size: 18),
-                        label: const Text('Supprimer'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                          side: const BorderSide(color: AppColors.error),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+            // Actions
+Row(
+  children: [
+    // ⭐ Bouton Confirmer (seulement si pending et je suis le débiteur)
+    if (tab.status == TabStatus.pending && tab.debtorId == currentUserId)
+      Expanded(
+        child: ElevatedButton.icon(
+          onPressed: () async {
+            Navigator.pop(context); // Fermer le modal
+            try {
+              await ref.read(tabsNotifierProvider.notifier).confirmTab(tab.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tab confirmée !'),
+                  backgroundColor: AppColors.success,
                 ),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erreur: $e'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+          icon: const Icon(Iconsax.tick_circle, size: 18),
+          label: const Text('Confirmer'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.success,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+    
+    // Espacement si le bouton confirmer est visible
+    if (tab.status == TabStatus.pending && tab.debtorId == currentUserId)
+      const SizedBox(width: 12),
+    
+    // Bouton Modifier
+    Expanded(
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          Navigator.pop(context);
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EditTabScreen(tab: tab),
+            ),
+          );
+          if (result == true) {
+            ref.refresh(tabsProvider);
+          }
+        },
+        icon: const Icon(Iconsax.edit, size: 18),
+        label: const Text('Modifier'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          side: const BorderSide(color: AppColors.accent),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    ),
+    
+    const SizedBox(width: 12),
+    
+    // Bouton Supprimer
+    Expanded(
+      child: OutlinedButton.icon(
+        onPressed: () {
+          Navigator.pop(context);
+          _showDeleteConfirmation(tab);
+        },
+        icon: const Icon(Iconsax.trash, size: 18),
+        label: const Text('Supprimer'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.error,
+          side: const BorderSide(color: AppColors.error),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    ),
+  ],
+),
               ],
             ),
           ),

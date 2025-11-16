@@ -41,26 +41,21 @@ export class TabsService {
 
   // Créer une tab
   async create(createTabDto: CreateTabDto, userId: string): Promise<TabEntity> {
-    console.log('✨ Creating tab for user:', userId); // Debug
-    
-    // Remplacer 'current_user' par le vrai userId
-    const creditorId = createTabDto.creditorId === 'current_user' 
-      ? userId 
-      : createTabDto.creditorId;
-    
-    const debtorId = createTabDto.debtorId === 'current_user'
-      ? userId
-      : createTabDto.debtorId;
+  console.log('✨ Creating tab for user:', userId);
+  
+  // Accepter les IDs tels quels (userId ou friendId)
+  const tab = this.tabRepository.create({
+    ...createTabDto,
+    status: TabStatus.PENDING,
+  });
 
-    const tab = this.tabRepository.create({
-      ...createTabDto,
-      creditorId,
-      debtorId,
-      status: TabStatus.PENDING,
-    });
+  console.log('📤 Tab data:', {
+    creditorId: tab.creditorId,
+    debtorId: tab.debtorId,
+  });
 
-    return this.tabRepository.save(tab);
-  }
+  return this.tabRepository.save(tab);
+}
 
   // Modifier une tab
   async update(id: string, updateTabDto: UpdateTabDto, userId: string): Promise<TabEntity> {

@@ -25,7 +25,7 @@ class ActivityRepository {
           activities.add(ActivityModel(
             id: tabJson['id'],
             type: ActivityType.tabCreated,
-            title: 'Tab créée',
+            title: 'Remboursement créée',
             description: '${tabJson['creditorName']} → ${tabJson['debtorName']}: ${tabJson['amount']}€',
             createdAt: DateTime.parse(tabJson['createdAt']),
             metadata: tabJson,

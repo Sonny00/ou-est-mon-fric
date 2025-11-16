@@ -80,34 +80,53 @@ class TabModel {
   // =========================================
 
   factory TabModel.fromJson(Map<String, dynamic> json) {
-    return TabModel(
-      id: json['id'],
-      creditorId: json['creditorId'],
-      creditorName: json['creditorName'],
-      debtorId: json['debtorId'],
-      debtorName: json['debtorName'],
-      amount: _parseAmount(json['amount']),
-      description: json['description'],
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
-      status: TabStatus.values.firstWhere(
-        (e) => e.toString() == 'TabStatus.${json['status']}',
-      ),
-      proofImageUrl: json['proofImageUrl'],
-      repaymentRequestedAt: json['repaymentRequestedAt'] != null
-          ? DateTime.parse(json['repaymentRequestedAt'])
-          : null,
-      settledAt: json['settledAt'] != null
-          ? DateTime.parse(json['settledAt'])
-          : null,
-      disputeReason: json['disputeReason'],
-      repaymentDeadline: json['repaymentDeadline'] != null
-          ? DateTime.parse(json['repaymentDeadline'])
-          : null,
-      deadlineNotificationSent: json['deadlineNotificationSent'] ?? false,
-    );
-  }
+  return TabModel(
+    id: json['id'],
+    creditorId: json['creditorId'],
+    creditorName: json['creditorName'],
+    debtorId: json['debtorId'],
+    debtorName: json['debtorName'],
+    amount: _parseAmount(json['amount']),
+    description: json['description'],
+    createdAt: DateTime.parse(json['createdAt']),
+    updatedAt: DateTime.parse(json['updatedAt']),
+    status: _parseStatus(json['status']), // ⭐ UTILISER LA NOUVELLE MÉTHODE
+    proofImageUrl: json['proofImageUrl'],
+    repaymentRequestedAt: json['repaymentRequestedAt'] != null
+        ? DateTime.parse(json['repaymentRequestedAt'])
+        : null,
+    settledAt: json['settledAt'] != null
+        ? DateTime.parse(json['settledAt'])
+        : null,
+    disputeReason: json['disputeReason'],
+    repaymentDeadline: json['repaymentDeadline'] != null
+        ? DateTime.parse(json['repaymentDeadline'])
+        : null,
+    deadlineNotificationSent: json['deadlineNotificationSent'] ?? false,
+  );
+}
 
+static TabStatus _parseStatus(dynamic status) {
+  if (status == null) return TabStatus.pending;
+  
+  final statusStr = status.toString().toLowerCase().replaceAll('_', '');
+  
+  switch (statusStr) {
+    case 'pending':
+      return TabStatus.pending;
+    case 'confirmed':
+      return TabStatus.confirmed;
+    case 'repaymentrequested':
+      return TabStatus.repaymentRequested;
+    case 'settled':
+      return TabStatus.settled;
+    case 'disputed':
+      return TabStatus.disputed;
+    default:
+      print('⚠️ Unknown status: $status, defaulting to pending');
+      return TabStatus.pending;
+  }
+}
   static double _parseAmount(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();

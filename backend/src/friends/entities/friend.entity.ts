@@ -1,13 +1,35 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
-import { TabEntity } from '../../tabs/entities/tab.entity'; // ← Importer TabEntity
+// backend/src/friends/entities/friend.entity.ts
+
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('friends')
 export class FriendEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('uuid')
   userId: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+  // ========== RENDRE NULLABLE ==========
+  @Column('uuid', { nullable: true }) // ← AJOUTER nullable: true
+  friendUserId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'friendUserId' })
+  friendUser: User | null;
+  // ====================================
 
   @Column()
   name: string;
@@ -23,16 +45,4 @@ export class FriendEntity {
 
   @CreateDateColumn()
   addedAt: Date;
-
-  @OneToMany(() => TabEntity, (tab) => tab.debtor, {
-    cascade: true,
-    onDelete: 'CASCADE',
-  })
-  tabsAsDebtor: TabEntity[];
-
-  @OneToMany(() => TabEntity, (tab) => tab.creditor, {
-    cascade: true,
-    onDelete: 'CASCADE',
-  })
-  tabsAsCreditor: TabEntity[];
 }

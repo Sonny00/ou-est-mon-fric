@@ -1,15 +1,12 @@
 // lib/data/repositories/auth_repository.dart
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/api_service.dart';
 import '../models/user_model.dart';
-import '../services/token_storage.dart';
-
+import '../services/token_storage.dart'; // ⭐ UTILISER UNIQUEMENT CELUI-CI
 
 class AuthRepository {
   final ApiService _apiService;
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
   );
@@ -24,6 +21,8 @@ class AuthRepository {
     String? phoneNumber,
   }) async {
     try {
+      print('📡 AuthRepository: Register...');
+      
       final response = await _apiService.post(
         '/auth/register',
         data: {
@@ -34,15 +33,22 @@ class AuthRepository {
         },
       );
 
-      final token = response['token'];
-      final user = UserModel.fromJson(response['user']);
+      print('📦 Register response: $response');
 
-      // Sauvegarder le token
-      await saveToken(token);
+      final token = response['token'];
+      final userData = response['user'];
+      final user = UserModel.fromJson(userData);
+
+      // ⭐ SAUVEGARDER TOKEN ET USER AVEC TokenStorage
+      await TokenStorage.saveToken(token);
+      await TokenStorage.saveUser(userData); // ⭐ AJOUTER CETTE LIGNE
+      
+      print('✅ Token et user sauvegardés');
 
       return {'user': user, 'token': token};
     } catch (e) {
-      throw Exception('Erreur lors de l\'inscription: $e');
+      print('❌ AuthRepository register error: $e');
+      rethrow;
     }
   }
 
@@ -52,6 +58,8 @@ class AuthRepository {
     required String password,
   }) async {
     try {
+      print('📡 AuthRepository: Login...');
+      
       final response = await _apiService.post(
         '/auth/login',
         data: {
@@ -60,21 +68,30 @@ class AuthRepository {
         },
       );
 
-      final token = response['token'];
-      final user = UserModel.fromJson(response['user']);
+      print('📦 Login response: $response');
 
-      // Sauvegarder le token
-      await saveToken(token);
+      final token = response['token'];
+      final userData = response['user'];
+      final user = UserModel.fromJson(userData);
+
+      // ⭐ SAUVEGARDER TOKEN ET USER AVEC TokenStorage
+      await TokenStorage.saveToken(token);
+      await TokenStorage.saveUser(userData); // ⭐ AJOUTER CETTE LIGNE
+      
+      print('✅ Token et user sauvegardés');
 
       return {'user': user, 'token': token};
     } catch (e) {
-      throw Exception('Erreur lors de la connexion: $e');
+      print('❌ AuthRepository login error: $e');
+      rethrow;
     }
   }
 
   // Google Sign-In
   Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
+      print('📡 AuthRepository: Google Sign-In...');
+      
       // Connexion Google
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
@@ -94,48 +111,59 @@ class AuthRepository {
       );
 
       final token = response['token'];
-      final user = UserModel.fromJson(response['user']);
+      final userData = response['user'];
+      final user = UserModel.fromJson(userData);
 
-      // Sauvegarder le token
-      await saveToken(token);
+      // ⭐ SAUVEGARDER TOKEN ET USER AVEC TokenStorage
+      await TokenStorage.saveToken(token);
+      await TokenStorage.saveUser(userData); // ⭐ AJOUTER CETTE LIGNE
+      
+      print('✅ Token et user sauvegardés (Google)');
 
       return {'user': user, 'token': token};
     } catch (e) {
-      throw Exception('Erreur Google Sign-In: $e');
+      print('❌ AuthRepository Google error: $e');
+      rethrow;
     }
   }
 
   // Récupérer l'utilisateur actuel
   Future<UserModel> getMe() async {
     try {
-      final token = await getToken();
-      if (token == null) {
-        throw Exception('Non authentifié');
-      }
-
-      _apiService.setAuthToken(token);
-
+      print('📡 AuthRepository: Get me...');
+      
       final response = await _apiService.get('/auth/me');
-      return UserModel.fromJson(response);
+      
+      print('📦 Get me response: $response');
+      
+      if (response['success'] == true) {
+        final userData = response['data'];
+        final user = UserModel.fromJson(userData);
+        
+        // ⭐ BONUS : Re-sauvegarder l'user à jour
+        await TokenStorage.saveUser(userData);
+        print('✅ User info mise à jour');
+        
+        return user;
+      } else {
+        throw Exception('Failed to get user');
+      }
     } catch (e) {
-      throw Exception('Erreur lors de la récupération du profil: $e');
+      print('❌ AuthRepository getMe error: $e');
+      rethrow;
     }
   }
 
-  // ✅ DÉCONNEXION CORRIGÉE AVEC GESTION D'ERREUR
+  // Déconnexion
   Future<void> logout() async {
     try {
       print('🔓 AuthRepository: Déconnexion...');
       
-      // 1. Supprimer le token local (PRIORITAIRE)
-      await deleteToken();
-      print('✅ Token local supprimé');
+      // 1. Supprimer le token avec TokenStorage
+      await TokenStorage.deleteToken();
+      print('✅ Token supprimé');
       
-      // 2. Nettoyer ApiService
-      _apiService.removeAuthToken();
-      print('✅ Token ApiService supprimé');
-      
-      // 3. Tenter de déconnecter Google (si connecté)
+      // 2. Tenter de déconnecter Google (si connecté)
       try {
         final isSignedIn = await _googleSignIn.isSignedIn();
         if (isSignedIn) {
@@ -144,38 +172,26 @@ class AuthRepository {
           print('✅ Déconnexion Google réussie');
         }
       } catch (googleError) {
-        // ✅ IGNORER L'ERREUR GOOGLE SIGN-IN
         print('⚠️ Impossible de déconnecter Google (ignoré): $googleError');
-        // Ne pas bloquer la déconnexion si Google échoue
       }
       
       print('✅ AuthRepository: Déconnexion complète');
     } catch (e) {
-      print('❌ AuthRepository: Erreur critique lors de la déconnexion: $e');
-      // Même en cas d'erreur, forcer la suppression du token
+      print('❌ AuthRepository logout error: $e');
+      // Forcer la suppression même en cas d'erreur
       try {
-        await deleteToken();
-        _apiService.removeAuthToken();
+        await TokenStorage.deleteToken();
       } catch (_) {}
       rethrow;
     }
   }
 
-  // Gestion du token
-  Future<void> saveToken(String token) async {
-    await _storage.write(key: 'auth_token', value: token);
-    _apiService.setAuthToken(token);
-  }
-
-  Future<String?> getToken() async {
-    return await _storage.read(key: 'auth_token');
-  }
-
-  Future<void> deleteToken() async {
-    await _storage.delete(key: 'auth_token');
-  }
+  // ⭐ SUPPRIMER CES MÉTHODES (on utilise TokenStorage maintenant)
+  // Future<void> saveToken(String token) async { ... }
+  // Future<String?> getToken() async { ... }
+  // Future<void> deleteToken() async { ... }
 
   Future<bool> isAuthenticated() async {
-  return await TokenStorage.hasToken();
-}
+    return await TokenStorage.hasToken();
+  }
 }

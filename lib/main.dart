@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/date_symbol_data_local.dart'; // ← Déjà présent
+import 'package:intl/date_symbol_data_local.dart'; 
 import 'core/theme/app_theme.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/navigation/screens/main_navigation_screen.dart';
 
 void main() async {
-  // ← AJOUTER CES 2 LIGNES
+
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
   
@@ -33,7 +33,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// ✅ Widget qui vérifie l'état d'authentification au démarrage
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({Key? key}) : super(key: key);
 
@@ -42,7 +41,6 @@ class AuthWrapper extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
-      // ✅ Utilisateur connecté -> MainNavigationScreen
       data: (user) {
         if (user != null) {
           return const MainNavigationScreen();
@@ -51,7 +49,6 @@ class AuthWrapper extends ConsumerWidget {
         }
       },
       
-      // ⏳ Chargement (vérification du token) -> Splash screen
       loading: () {
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -83,7 +80,6 @@ class AuthWrapper extends ConsumerWidget {
         );
       },
       
-      // ❌ Erreur -> LoginScreen
       error: (error, stack) {
         return const LoginScreen();
       },

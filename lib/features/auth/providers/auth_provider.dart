@@ -35,40 +35,50 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   }
 
   /// ✅ Vérifier si l'utilisateur est déjà connecté (avec token)
-  Future<void> checkAuth() async {
-  print('🔍 AuthNotifier: Vérification de l\'authentification...');
+ /// ✅ Vérifier si l'utilisateur est déjà connecté (avec token)
+Future<void> checkAuth() async {
+  print('🔍 === VÉRIFICATION AUTH ===');
   
   try {
-    // Vérifier si un token existe
-    final hasToken = await TokenStorage.hasToken();
+    // 1. Vérifier si un token existe
+    final savedToken = await TokenStorage.getToken();
+    final savedUser = await TokenStorage.getUser();
     
-    if (!hasToken) {
-      print('⚠️ AuthNotifier: Aucun token trouvé');
+    print('Token en storage: ${savedToken != null ? "✅" : "❌"}');
+    print('User en storage: ${savedUser != null ? "✅" : "❌"}');
+    
+    if (savedToken == null) {
+      print('❌ Pas de token → Déconnecté');
       state = const AsyncValue.data(null);
       return;
     }
 
-    print('✅ AuthNotifier: Token trouvé, récupération des infos utilisateur...');
+    // 2. Vérifier que le token est encore valide en appelant /auth/me
+    print('✅ Token trouvé, vérification validité...');
     
-    // Récupérer les infos de l'utilisateur
-    final user = await _repository.getMe();
-    state = AsyncValue.data(user);
-    
-    print('✅ AuthNotifier: Utilisateur connecté - ${user.name}');
-  } catch (e, st) {
-    print('❌ AuthNotifier: Erreur lors de la vérification - $e');
-    
-    // Si erreur 401, le token est invalide -> déconnecter
-    if (e.toString().contains('401') || e.toString().contains('Non autorisé')) {
-      print('⚠️ AuthNotifier: Token invalide, déconnexion...');
-      await TokenStorage.deleteToken();
+    try {
+      final user = await _repository.getMe();
+      state = AsyncValue.data(user);
+      print('✅ Token valide → Utilisateur connecté: ${user.name}');
+    } catch (e) {
+      // Token invalide ou expiré
+      print('❌ Token invalide/expiré: $e');
+      
+      // Si c'est une erreur 401, supprimer le token
+      if (e.toString().contains('401') || e.toString().contains('Non autorisé')) {
+        print('🗑️ Suppression du token invalide');
+        await TokenStorage.deleteToken();
+      }
+      
       state = const AsyncValue.data(null);
-    } else {
-      state = AsyncValue.error(e, st);
     }
+    
+    print('=========================');
+  } catch (e, st) {
+    print('❌ Erreur checkAuth: $e');
+    state = const AsyncValue.data(null);
   }
 }
-
   /// S'inscrire
   Future<void> register({
     required String name,

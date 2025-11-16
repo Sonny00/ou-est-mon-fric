@@ -30,6 +30,8 @@ class _CreateTabScreenState extends ConsumerState<CreateTabScreen> {
   bool _iOwe = false; 
   String? _imagePath;
   bool _isLoading = false;
+  DateTime? _selectedDeadline; 
+  
 
   @override
   void initState() {
@@ -391,6 +393,78 @@ class _CreateTabScreenState extends ConsumerState<CreateTabScreen> {
                     ),
                   ),
 
+                  const SizedBox(height: 16),
+
+// ⭐ Date limite (optionnel)
+Container(
+  padding: const EdgeInsets.all(16),
+  decoration: AppStyles.card(),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Date limite (optionnel)',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 12),
+      InkWell(
+        onTap: _selectDeadline,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Iconsax.calendar,
+                color: _selectedDeadline != null 
+                    ? AppColors.accent 
+                    : AppColors.textSecondary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _selectedDeadline != null
+                      ? '${_selectedDeadline!.day}/${_selectedDeadline!.month}/${_selectedDeadline!.year}'
+                      : 'Aucune deadline',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: _selectedDeadline != null
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              if (_selectedDeadline != null)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDeadline = null;
+                    });
+                  },
+                  child: const Icon(
+                    Iconsax.close_circle,
+                    color: AppColors.textTertiary,
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+
                   const SizedBox(height: 24),
 
                   // Bouton créer
@@ -564,6 +638,36 @@ class _CreateTabScreenState extends ConsumerState<CreateTabScreen> {
       setState(() => _imagePath = image.path);
     }
   }
+
+
+  Future<void> _selectDeadline() async {
+  final DateTime? picked = await showDatePicker(
+    context: context,
+    initialDate: _selectedDeadline ?? DateTime.now().add(const Duration(days: 7)),
+    firstDate: DateTime.now(),
+    lastDate: DateTime.now().add(const Duration(days: 365)),
+    builder: (context, child) {
+      return Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.accent,
+            onPrimary: AppColors.background,
+            surface: AppColors.surface,
+            onSurface: AppColors.textPrimary,
+          ),
+        ),
+        child: child!,
+      );
+    },
+  );
+  
+  if (picked != null && picked != _selectedDeadline) {
+    setState(() {
+      _selectedDeadline = picked;
+    });
+  }
+}
+
 Future<void> _handleCreateTab() async {
   if (!_formKey.currentState!.validate()) {
     return;
@@ -592,14 +696,22 @@ Future<void> _handleCreateTab() async {
     print('Friend: ${_selectedFriend!.name}');
     print('Amount: $amount€');
     
-   final data = {
-  'creditorId': _iOwe ? _selectedFriend!.id : currentUserId,
-  'creditorName': _iOwe ? _selectedFriend!.name : 'Moi',
-  'debtorId': _iOwe ? currentUserId : _selectedFriend!.id,
-  'debtorName': _iOwe ? 'Moi' : _selectedFriend!.name,
+final data = {
+  'creditorId': _iOwe 
+      ? (_selectedFriend!.friendUserId ?? _selectedFriend!.id) 
+      : currentUserId,
+  'creditorName': _iOwe ? _selectedFriend!.name : currentUser?.name ?? 'Moi',
+  'debtorId': _iOwe 
+      ? currentUserId 
+      : (_selectedFriend!.friendUserId ?? _selectedFriend!.id),
+  'debtorName': _iOwe ? currentUser?.name ?? 'Moi' : _selectedFriend!.name,
   'amount': amount,
   'description': _descriptionController.text,
   if (_imagePath != null) 'proofImageUrl': _imagePath,
+  
+  // ⭐ AJOUTER CETTE LIGNE
+  if (_selectedDeadline != null) 
+    'repaymentDeadline': _selectedDeadline!.toIso8601String(),
 };
 
     print('📤 Data envoyée:');
@@ -645,6 +757,7 @@ class _ToggleOption extends StatelessWidget {
   final bool isSelected;
   final Color color;
   final VoidCallback onTap;
+  
 
   const _ToggleOption({
     required this.label,

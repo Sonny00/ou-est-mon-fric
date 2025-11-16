@@ -86,29 +86,28 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
   
-  Future<void> requestRepayment(String id, {String? proofImageUrl}) async {
-    state = const AsyncValue.loading();
-    try {
-      await _repository.requestRepayment(id, proofImageUrl: proofImageUrl);
-      _ref.invalidate(tabsProvider);
-      _ref.invalidate(activityProvider); // ← AJOUTER
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+Future<void> requestRepayment(String tabId) async {
+  state = const AsyncValue.loading();
+  try {
+    await _repository.requestRepayment(tabId);
+    _ref.invalidate(tabsProvider);
+    state = const AsyncValue.data(null);
+  } catch (e, st) {
+    state = AsyncValue.error(e, st);
+    rethrow;
   }
-  
-  Future<void> confirmRepayment(String id) async {
-    state = const AsyncValue.loading();
-    try {
-      await _repository.confirmRepayment(id);
-      _ref.invalidate(tabsProvider);
-      _ref.invalidate(activityProvider); // ← AJOUTER
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+}
+ Future<void> confirmRepayment(String tabId) async {
+  state = const AsyncValue.loading();
+  try {
+    await _repository.confirmRepayment(tabId);
+    _ref.invalidate(tabsProvider);
+    state = const AsyncValue.data(null);
+  } catch (e, st) {
+    state = AsyncValue.error(e, st);
+    rethrow;
   }
+}
 }
 
 final tabsNotifierProvider = StateNotifierProvider<TabsNotifier, AsyncValue<void>>((ref) {

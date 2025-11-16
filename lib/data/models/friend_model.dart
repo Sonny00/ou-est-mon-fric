@@ -1,8 +1,9 @@
-import 'package:intl/intl.dart';
-
+// lib/data/models/friend_model.dart
 
 class Friend {
   final String id;
+  final String userId;
+  final String? friendUserId; // ← Nullable
   final String name;
   final String? phoneNumber;
   final String? email;
@@ -11,6 +12,8 @@ class Friend {
   
   Friend({
     required this.id,
+    required this.userId,
+    this.friendUserId, // ← Nullable
     required this.name,
     this.phoneNumber,
     this.email,
@@ -29,6 +32,8 @@ class Friend {
   factory Friend.fromJson(Map<String, dynamic> json) {
     return Friend(
       id: json['id'],
+      userId: json['userId'],
+      friendUserId: json['friendUserId'], // ← Peut être null
       name: json['name'],
       phoneNumber: json['phoneNumber'],
       email: json['email'],
@@ -40,6 +45,8 @@ class Friend {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'userId': userId,
+      'friendUserId': friendUserId, // ← Peut être null
       'name': name,
       'phoneNumber': phoneNumber,
       'email': email,

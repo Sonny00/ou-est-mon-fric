@@ -21,9 +21,7 @@ export class UpdateTabDto extends PartialType(CreateTabDto) {
   @IsOptional()
   proofImageUrl?: string;
 
-  // ========== AJOUTER CETTE LIGNE ==========
   @IsDateString()
   @IsOptional()
   repaymentDeadline?: string;
-  // =========================================
 }
