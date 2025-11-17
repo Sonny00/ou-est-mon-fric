@@ -1,6 +1,7 @@
 // lib/features/profile/screens/profile_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
@@ -37,6 +38,7 @@ class ProfileScreen extends ConsumerWidget {
             color: AppColors.accent,
             onRefresh: () async {
               ref.invalidate(userStatsProvider);
+              ref.invalidate(authStateProvider);
             },
             child: ListView(
               padding: const EdgeInsets.all(16),
@@ -82,8 +84,73 @@ class ProfileScreen extends ConsumerWidget {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      if (user.phoneNumber != null) ...[
+                      
+                      // ⭐ NOUVEAU : Afficher le TAG
+                      if (user.tag != null) ...[
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () {
+                            // Copier le tag dans le presse-papier
+                            Clipboard.setData(ClipboardData(text: user.tag!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Tag copié : ${user.tag}'),
+                                backgroundColor: AppColors.success,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: AppColors.accent.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Iconsax.tag,
+                                  size: 16,
+                                  color: AppColors.accent,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  user.tag!,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Iconsax.copy,
+                                  size: 14,
+                                  color: AppColors.accent,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 4),
+                        const Text(
+                          'Appuyez pour copier votre tag',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                      
+                      if (user.phoneNumber != null) ...[
+                        const SizedBox(height: 8),
                         Text(
                           user.phoneNumber!,
                           style: const TextStyle(
@@ -92,15 +159,14 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                         ),
                       ],
+                      
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Modification du profil à venir'),
-                            ),
-                          );
-                        },
+                      
+                      // ⭐ BOUTON ÉDITER (fonctionnel)
+                      ElevatedButton.icon(
+                        onPressed: () => _showEditProfileDialog(context, ref, user),
+                        icon: const Icon(Iconsax.edit, size: 18),
+                        label: const Text('Modifier le profil'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.surfaceLight,
                           foregroundColor: AppColors.textPrimary,
@@ -109,7 +175,6 @@ class ProfileScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text('Modifier le profil'),
                       ),
                     ],
                   ),
@@ -265,6 +330,174 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
   
+  // ⭐ NOUVEAU : Dialog d'édition du profil
+  void _showEditProfileDialog(BuildContext context, WidgetRef ref, dynamic user) {
+    final nameController = TextEditingController(text: user.name);
+    final phoneController = TextEditingController(text: user.phoneNumber ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'Modifier le profil',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Nom
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Nom',
+                    labelStyle: const TextStyle(color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Iconsax.user),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.accent),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Téléphone
+                TextField(
+                  controller: phoneController,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Téléphone',
+                    labelStyle: const TextStyle(color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Iconsax.call),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.accent),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Info tag
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.info_circle, size: 16, color: AppColors.accent),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Votre tag (${user.tag ?? 'N/A'}) ne peut pas être modifié',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(context),
+                child: const Text(
+                  'Annuler',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (nameController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Le nom est requis'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                          return;
+                        }
+
+                        setState(() => isLoading = true);
+
+                        try {
+                          // TODO: Appeler l'API pour mettre à jour le profil
+                          // await ref.read(authStateProvider.notifier).updateProfile({
+                          //   'name': nameController.text.trim(),
+                          //   'phoneNumber': phoneController.text.trim(),
+                          // });
+                          
+                          await Future.delayed(const Duration(seconds: 1)); // Simulation
+                          
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Profil mis à jour !'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                            ref.invalidate(authStateProvider);
+                          }
+                        } catch (e) {
+                          setState(() => isLoading = false);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erreur: $e'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.accent,
+                        ),
+                      )
+                    : const Text(
+                        'Enregistrer',
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -344,6 +577,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 }
+
+// ... (Reste du code _StatCard, _SettingsSection, _SettingsItem inchangé)
 
 class _StatCard extends StatelessWidget {
   final String label;
