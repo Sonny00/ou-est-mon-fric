@@ -28,6 +28,12 @@ export class FriendsService {
 
 // backend/src/friends/friends.service.ts
 
+// backend/src/friends/friends.service.ts
+
+// backend/src/friends/friends.service.ts
+
+// backend/src/friends/friends.service.ts
+
 async findAllByUser(userId: string): Promise<FriendEntity[]> {
   console.log('🔍 Finding friends for user:', userId);
   
@@ -44,36 +50,61 @@ async findAllByUser(userId: string): Promise<FriendEntity[]> {
         isVerified: true,
       },
     ],
-    relations: ['friendUser', 'user'],
+    relations: ['friendUser', 'user'], // ⭐ IMPORTANT : Charger les relations
     order: { addedAt: 'DESC' },
   });
 
-  console.log(`📊 Avant filtrage: ${friends.length} relations trouvées`);
+  console.log(`📊 Relations trouvées AVANT filtrage: ${friends.length}`);
+  
   friends.forEach(f => {
-    console.log(`   - userId: ${f.userId}, friendUserId: ${f.friendUserId}`);
+    console.log(`   - ID: ${f.id}, userId: ${f.userId}, friendUserId: ${f.friendUserId}, name: ${f.name}`);
   });
 
-  // ⭐ NOUVEAU FILTRE : Éliminer les doublons et soi-même
-  const uniqueFriends = new Map<string, FriendEntity>();
+  const uniqueFriendsMap = new Map<string, FriendEntity>();
   
   for (const friend of friends) {
-    let actualFriendUserId: string | null = null;
-    
-    // Déterminer qui est le vrai ami (pas moi)
-    if (friend.userId === userId && friend.friendUserId && friend.friendUserId !== userId) {
-      actualFriendUserId = friend.friendUserId;
-    } else if (friend.friendUserId === userId && friend.userId !== userId) {
-      actualFriendUserId = friend.userId;
+    if (friend.userId === friend.friendUserId) {
+      console.log(`   ⚠️ IGNORÉ (auto-relation): ${friend.id}`);
+      continue;
     }
     
-    // Seulement ajouter si c'est un vrai ami (pas moi)
-    if (actualFriendUserId && !uniqueFriends.has(actualFriendUserId)) {
-      uniqueFriends.set(actualFriendUserId, friend);
+    let otherUserId: string;
+    
+    if (friend.userId === userId) {
+      otherUserId = friend.friendUserId!;
+      
+      // ⭐ CORRIGER : Mettre à jour le name avec celui de friendUser
+      if (friend.friendUser) {
+        friend.name = friend.friendUser.name;
+        friend.email = friend.friendUser.email;
+        console.log(`   📝 Mise à jour name: ${friend.name} (friendUser)`);
+      }
+    } else {
+      otherUserId = friend.userId;
+      
+      // ⭐ CORRIGER : Mettre à jour le name avec celui de user
+      if (friend.user) {
+        friend.name = friend.user.name;
+        friend.email = friend.user.email;
+        console.log(`   📝 Mise à jour name: ${friend.name} (user)`);
+      }
+    }
+    
+    if (otherUserId === userId) {
+      console.log(`   ⚠️ IGNORÉ (c'est moi): ${friend.id}`);
+      continue;
+    }
+    
+    if (!uniqueFriendsMap.has(otherUserId)) {
+      uniqueFriendsMap.set(otherUserId, friend);
+      console.log(`   ✅ AJOUTÉ: ${friend.id}, ami: ${otherUserId}, name: ${friend.name}`);
+    } else {
+      console.log(`   ⚠️ DUPLIQUÉ (déjà ajouté): ${friend.id}`);
     }
   }
 
-  const result = Array.from(uniqueFriends.values());
-  console.log(`✅ Après filtrage: ${result.length} amis uniques`);
+  const result = Array.from(uniqueFriendsMap.values());
+  console.log(`✅ Amis uniques APRÈS filtrage: ${result.length}`);
   
   return result;
 }
