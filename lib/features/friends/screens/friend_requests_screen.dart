@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/friends_provider.dart';
 
+// ⭐ CHANGER : ConsumerWidget (pas StatefulWidget)
 class FriendRequestsScreen extends ConsumerWidget {
   const FriendRequestsScreen({Key? key}) : super(key: key);
 
@@ -149,13 +150,17 @@ class _ReceivedRequestCard extends ConsumerWidget {
                 onPressed: () async {
                   try {
                     await ref.read(friendsNotifierProvider.notifier).acceptRequest(request.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Invitation acceptée')),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invitation acceptée')),
+                      );
+                    }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Erreur: $e')),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erreur: $e')),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Iconsax.tick_circle, color: AppColors.success),
@@ -164,13 +169,17 @@ class _ReceivedRequestCard extends ConsumerWidget {
                 onPressed: () async {
                   try {
                     await ref.read(friendsNotifierProvider.notifier).rejectRequest(request.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Invitation refusée')),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invitation refusée')),
+                      );
+                    }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Erreur: $e')),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erreur: $e')),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Iconsax.close_circle, color: AppColors.error),
@@ -250,13 +259,17 @@ class _SentRequestCard extends ConsumerWidget {
             onPressed: () async {
               try {
                 await ref.read(friendsNotifierProvider.notifier).cancelRequest(request.id);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invitation annulée')),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invitation annulée')),
+                  );
+                }
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Erreur: $e')),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erreur: $e')),
+                  );
+                }
               }
             },
             icon: const Icon(Iconsax.close_circle, color: AppColors.error),

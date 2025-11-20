@@ -36,6 +36,7 @@ class UserModel {
       phoneNumber: json['phoneNumber'],
       avatarUrl: json['avatarUrl'],
       isEmailVerified: json['isEmailVerified'] ?? false,
+      tag: json['tag'],
     );
   }
 
@@ -47,6 +48,7 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'avatarUrl': avatarUrl,
       'isEmailVerified': isEmailVerified,
+      'tag': tag,
     };
   }
 }

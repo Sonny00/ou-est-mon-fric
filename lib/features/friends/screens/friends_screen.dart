@@ -23,6 +23,14 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
 
+
+  @override
+  void initState() {
+    super.initState();
+    
+  }
+
+
   @override
   void dispose() {
     _searchController.dispose();

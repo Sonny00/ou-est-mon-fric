@@ -9,6 +9,7 @@ import { FriendsModule } from './friends/friends.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { use } from 'passport';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { use } from 'passport';
     FriendsModule,
     AuthModule,
     UsersModule,
+    NotificationsModule,
+    
   ],
   controllers: [AppController],
 })

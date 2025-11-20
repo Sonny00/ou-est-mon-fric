@@ -10,6 +10,7 @@ import { CreateFriendDto } from './dto/create-friend.dto';
 import { UpdateFriendDto } from './dto/update-friend.dto';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
 import { FriendRequestResponse } from './dto/respond-friend-request.dto';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class FriendsService {
@@ -20,18 +21,62 @@ export class FriendsService {
     private readonly tabRepository: Repository<TabEntity>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly notificationsGateway: NotificationsGateway, // ⭐ AJOUTER
   ) {}
 
-  // ========== MÉTHODES EXISTANTES (inchangées) ==========
+ // backend/src/friends/friends.service.ts
 
-  async findAllByUser(userId: string): Promise<FriendEntity[]> {
-    console.log('🔍 Finding friends for user:', userId);
-    return this.friendRepository.find({
-      where: { userId },
-      relations: ['friendUser'],
-      order: { addedAt: 'DESC' },
-    });
+// backend/src/friends/friends.service.ts
+
+async findAllByUser(userId: string): Promise<FriendEntity[]> {
+  console.log('🔍 Finding friends for user:', userId);
+  
+  const friends = await this.friendRepository.find({
+    where: [
+      { 
+        userId,
+        status: FriendStatus.ACCEPTED,
+        isVerified: true,
+      },
+      { 
+        friendUserId: userId,
+        status: FriendStatus.ACCEPTED,
+        isVerified: true,
+      },
+    ],
+    relations: ['friendUser', 'user'],
+    order: { addedAt: 'DESC' },
+  });
+
+  console.log(`📊 Avant filtrage: ${friends.length} relations trouvées`);
+  friends.forEach(f => {
+    console.log(`   - userId: ${f.userId}, friendUserId: ${f.friendUserId}`);
+  });
+
+  // ⭐ NOUVEAU FILTRE : Éliminer les doublons et soi-même
+  const uniqueFriends = new Map<string, FriendEntity>();
+  
+  for (const friend of friends) {
+    let actualFriendUserId: string | null = null;
+    
+    // Déterminer qui est le vrai ami (pas moi)
+    if (friend.userId === userId && friend.friendUserId && friend.friendUserId !== userId) {
+      actualFriendUserId = friend.friendUserId;
+    } else if (friend.friendUserId === userId && friend.userId !== userId) {
+      actualFriendUserId = friend.userId;
+    }
+    
+    // Seulement ajouter si c'est un vrai ami (pas moi)
+    if (actualFriendUserId && !uniqueFriends.has(actualFriendUserId)) {
+      uniqueFriends.set(actualFriendUserId, friend);
+    }
   }
+
+  const result = Array.from(uniqueFriends.values());
+  console.log(`✅ Après filtrage: ${result.length} amis uniques`);
+  
+  return result;
+}
 
   async findOne(id: string, userId: string): Promise<FriendEntity> {
     const friend = await this.friendRepository.findOne({
@@ -67,91 +112,147 @@ export class FriendsService {
     return this.friendRepository.save(friend);
   }
 
-  async remove(id: string, userId: string): Promise<{ deleted: boolean; message: string; deletedTabsCount: number }> {
-    console.log('🗑️ === DÉBUT SUPPRESSION EN CASCADE ===');
+ // backend/src/friends/friends.service.ts
+
+async remove(id: string, userId: string): Promise<{ deleted: boolean; message: string; deletedTabsCount: number }> {
+  console.log('🗑️ === DÉBUT SUPPRESSION ===');
+  console.log(`   Friend ID: ${id}`);
+  console.log(`   User ID: ${userId}`);
+  
+  try {
+    const friend = await this.friendRepository.findOne({
+      where: { id },
+      relations: ['friendUser', 'user'],
+    });
+
+    if (!friend) {
+      throw new NotFoundException(`Friend with ID ${id} not found`);
+    }
+
+    console.log(`   Ami trouvé:`);
+    console.log(`     - userId: ${friend.userId}`);
+    console.log(`     - friendUserId: ${friend.friendUserId}`);
+    console.log(`     - isVerified: ${friend.isVerified}`);
+
+    const canDelete = friend.userId === userId || friend.friendUserId === userId;
     
-    try {
-      const friend = await this.findOne(id, userId);
-      console.log('✅ Ami trouvé:', friend.name);
-      
-      const tabsCount = await this.tabRepository.count({
-        where: [
-          { debtorId: id },
-          { creditorId: id },
-        ],
-      });
-      console.log(`📊 Nombre de tabs à supprimer: ${tabsCount}`);
-      
+    if (!canDelete) {
+      throw new NotFoundException(`You don't have permission to delete this friend`);
+    }
+
+    const tabsCount = await this.tabRepository.count({
+      where: [
+        { debtorId: id },
+        { creditorId: id },
+      ],
+    });
+    console.log(`📊 Tabs à supprimer: ${tabsCount}`);
+    
+    if (tabsCount > 0) {
       await this.tabRepository.delete({ debtorId: id });
       await this.tabRepository.delete({ creditorId: id });
       console.log('✅ Tabs supprimées');
-      
-      if (friend.isVerified && friend.friendUserId) {
-        const reciprocal = await this.friendRepository.findOne({
-          where: { userId: friend.friendUserId, friendUserId: userId },
-        });
-        if (reciprocal) {
-          await this.friendRepository.remove(reciprocal);
-          console.log('✅ Relation réciproque supprimée');
-        }
-      }
-      
-      await this.friendRepository.remove(friend);
-      console.log('✅ Ami supprimé');
-      
-      return { 
-        deleted: true, 
-        message: `Friend and ${tabsCount} associated tabs deleted successfully`,
-        deletedTabsCount: tabsCount,
-      };
-      
-    } catch (error) {
-      console.error('❌ Erreur suppression:', error);
-      throw error;
     }
+    
+    // ⭐ IDENTIFIER l'autre utilisateur AVANT la suppression
+    let otherUserId: string | null = null;
+    if (friend.isVerified && friend.friendUserId) {
+      otherUserId = friend.userId === userId ? friend.friendUserId : friend.userId;
+    }
+    
+    if (friend.isVerified && friend.friendUserId) {
+      console.log('🔍 Recherche de toutes les relations entre les utilisateurs...');
+      
+      const allRelations = await this.friendRepository.find({
+        where: [
+          { userId: friend.userId, friendUserId: friend.friendUserId },
+          { userId: friend.friendUserId, friendUserId: friend.userId },
+        ],
+      });
+
+      console.log(`   Trouvé ${allRelations.length} relation(s) à supprimer`);
+      
+      if (allRelations.length > 0) {
+        await this.friendRepository.remove(allRelations);
+        console.log(`✅ ${allRelations.length} relation(s) supprimée(s)`);
+      }
+    } else {
+      await this.friendRepository.remove(friend);
+      console.log('✅ Ami non-vérifié supprimé');
+    }
+    
+    // ⭐ AJOUTER : Notifier l'autre utilisateur via WebSocket
+    if (otherUserId) {
+      const currentUser = await this.userRepository.findOne({ where: { id: userId } });
+      
+      this.notificationsGateway.sendToUser(otherUserId, 'friend_deleted', {
+        deletedBy: {
+          id: currentUser?.id,
+          name: currentUser?.name,
+          tag: currentUser?.tag,
+        },
+      });
+      
+      console.log(`📤 Notification de suppression envoyée à ${otherUserId}`);
+    }
+    
+    return { 
+      deleted: true, 
+      message: `Friend and ${tabsCount} associated tabs deleted successfully`,
+      deletedTabsCount: tabsCount,
+    };
+    
+  } catch (error) {
+    console.error('❌ Erreur suppression:', error);
+    throw error;
   }
+}
 
-  // ========== ⭐ NOUVELLES MÉTHODES POUR AMIS VÉRIFIÉS (PAR TAG) ==========
-
-  /**
-   * Envoyer une invitation à un ami vérifié PAR TAG
-   */
   async sendFriendRequest(
     userId: string,
     dto: SendFriendRequestDto,
   ): Promise<{ friend: FriendEntity; reciprocalFriend: FriendEntity }> {
     console.log(`👥 Envoi invitation de ${userId} au tag ${dto.tag}`);
 
-    // 1. Trouver l'utilisateur cible PAR TAG
+    const currentUser = await this.userRepository.findOne({ where: { id: userId } });
+    if (!currentUser) {
+      throw new NotFoundException('Utilisateur actuel non trouvé');
+    }
+
     const targetUser = await this.userRepository.findOne({
-      where: { tag: dto.tag }, // ⭐ Changé
+      where: { tag: dto.tag },
     });
 
     if (!targetUser) {
       throw new NotFoundException(`Aucun utilisateur trouvé avec le tag "${dto.tag}"`);
     }
 
-    // Vérifier que l'utilisateur ne s'ajoute pas lui-même
-    const currentUser = await this.userRepository.findOne({ where: { id: userId } });
-    
     if (currentUser.tag === dto.tag) {
       throw new BadRequestException('Tu ne peux pas t\'ajouter toi-même');
     }
 
-    // 2. Vérifier si déjà amis
-    const existing = await this.friendRepository.findOne({
+    const existingOutgoing = await this.friendRepository.findOne({
       where: { userId, friendUserId: targetUser.id },
     });
+
+    const existingIncoming = await this.friendRepository.findOne({
+      where: { userId: targetUser.id, friendUserId: userId },
+    });
+
+    const existing = existingOutgoing || existingIncoming;
 
     if (existing) {
       if (existing.status === FriendStatus.ACCEPTED) {
         throw new ConflictException('Vous êtes déjà amis');
       } else if (existing.status === FriendStatus.PENDING) {
-        throw new ConflictException('Une invitation est déjà en attente');
+        if (existingOutgoing) {
+          throw new ConflictException('Tu as déjà envoyé une invitation à cet utilisateur');
+        } else {
+          throw new ConflictException('Cet utilisateur t\'a déjà envoyé une invitation. Vérifie tes invitations reçues.');
+        }
       }
     }
 
-    // 3. Créer la relation bidirectionnelle
     const friend = this.friendRepository.create({
       userId,
       friendUserId: targetUser.id,
@@ -172,15 +273,41 @@ export class FriendsService {
 
     await this.friendRepository.save([friend, reciprocalFriend]);
 
+    // ⭐ AJOUTER : Envoyer notification WebSocket
+    this.notificationsGateway.sendToUser(targetUser.id, 'friend_request_received', {
+      requestId: reciprocalFriend.id,
+      from: {
+        id: currentUser.id,
+        name: currentUser.name,
+        tag: currentUser.tag,
+      },
+    });
+
     console.log(`✅ Invitation envoyée à ${targetUser.name} (${targetUser.tag})`);
     return { friend, reciprocalFriend };
   }
 
-  /**
-   * Récupérer les invitations reçues
-   */
   async getReceivedRequests(userId: string): Promise<FriendEntity[]> {
-    return this.friendRepository.find({
+    console.log(`📥 Récupération des invitations REÇUES pour ${userId}`);
+    
+    const requests = await this.friendRepository.find({
+      where: {
+        friendUserId: userId,
+        status: FriendStatus.PENDING,
+        isVerified: true,
+      },
+      relations: ['user'],
+      order: { addedAt: 'DESC' },
+    });
+
+    console.log(`✅ ${requests.length} invitations reçues trouvées`);
+    return requests;
+  }
+
+  async getSentRequests(userId: string): Promise<FriendEntity[]> {
+    console.log(`📤 Récupération des invitations ENVOYÉES pour ${userId}`);
+    
+    const sentRequests = await this.friendRepository.find({
       where: {
         userId,
         status: FriendStatus.PENDING,
@@ -189,102 +316,122 @@ export class FriendsService {
       relations: ['friendUser'],
       order: { addedAt: 'DESC' },
     });
-  }
 
-  /**
-   * Récupérer les invitations envoyées
-   */
-  async getSentRequests(userId: string): Promise<FriendEntity[]> {
-    // ⭐ FIX : La bonne requête pour les invitations ENVOYÉES
-    const sentRequests = await this.friendRepository
-      .createQueryBuilder('friend')
-      .leftJoinAndSelect('friend.friendUser', 'friendUser')
-      .where('friend.userId = :userId', { userId })
-      .andWhere('friend.status = :status', { status: FriendStatus.PENDING })
-      .andWhere('friend.isVerified = :isVerified', { isVerified: true })
-      .andWhere('friend.friendUserId IS NOT NULL')
-      .orderBy('friend.addedAt', 'DESC')
-      .getMany();
-
+    console.log(`✅ ${sentRequests.length} invitations envoyées trouvées`);
     return sentRequests;
   }
 
-  /**
-   * Accepter ou refuser une invitation
-   */
   async respondToRequest(
     userId: string,
     friendId: string,
     response: FriendRequestResponse,
   ): Promise<FriendEntity | null> {
     console.log(`👥 Réponse à l'invitation ${friendId}: ${response}`);
+    console.log(`   User ID qui répond: ${userId}`);
 
-    const friend = await this.friendRepository.findOne({
-      where: { id: friendId, userId, status: FriendStatus.PENDING },
-      relations: ['friendUser'],
+    const invitation = await this.friendRepository.findOne({
+      where: { 
+        id: friendId,
+        status: FriendStatus.PENDING 
+      },
+      relations: ['user', 'friendUser'],
     });
 
-    if (!friend || !friend.friendUserId) {
+    if (!invitation) {
       throw new NotFoundException('Invitation non trouvée');
     }
 
-    const reciprocal = await this.friendRepository.findOne({
-      where: {
-        userId: friend.friendUserId,
-        friendUserId: userId,
-        status: FriendStatus.PENDING,
-      },
+    console.log(`   Invitation trouvée:`);
+    console.log(`     - userId: ${invitation.userId}`);
+    console.log(`     - friendUserId: ${invitation.friendUserId}`);
+
+    const canRespond = invitation.userId === userId || invitation.friendUserId === userId;
+    
+    if (!canRespond) {
+      throw new NotFoundException('Cette invitation ne te concerne pas');
+    }
+
+    const allPendingRelations = await this.friendRepository.find({
+      where: [
+        { 
+          userId: invitation.userId, 
+          friendUserId: invitation.friendUserId,
+          status: FriendStatus.PENDING,
+        },
+        { 
+          userId: invitation.friendUserId, 
+          friendUserId: invitation.userId,
+          status: FriendStatus.PENDING,
+        },
+      ],
     });
 
+    console.log(`   Trouvé ${allPendingRelations.length} relation(s) pending entre ces utilisateurs`);
+
     if (response === FriendRequestResponse.ACCEPT) {
-      friend.status = FriendStatus.ACCEPTED;
-      if (reciprocal) {
-        reciprocal.status = FriendStatus.ACCEPTED;
-        await this.friendRepository.save([friend, reciprocal]);
-      } else {
-        await this.friendRepository.save(friend);
+      allPendingRelations.forEach(rel => {
+        rel.status = FriendStatus.ACCEPTED;
+      });
+      
+      await this.friendRepository.save(allPendingRelations);
+
+      // ⭐ AJOUTER : Notifier l'envoyeur
+      const otherUserId = invitation.userId === userId 
+        ? invitation.friendUserId 
+        : invitation.userId;
+      
+      if (otherUserId) {
+        const acceptingUser = await this.userRepository.findOne({ where: { id: userId } });
+        
+        this.notificationsGateway.sendToUser(otherUserId, 'friend_request_accepted', {
+          from: {
+            id: acceptingUser?.id,
+            name: acceptingUser?.name,
+            tag: acceptingUser?.tag,
+          },
+        });
       }
 
-      console.log(`✅ Invitation acceptée`);
-      return friend;
+      console.log(`✅ ${allPendingRelations.length} relation(s) acceptée(s) - Les deux utilisateurs sont maintenant amis`);
+      
+      return invitation;
     } else {
-      if (reciprocal) {
-        await this.friendRepository.remove([friend, reciprocal]);
-      } else {
-        await this.friendRepository.remove(friend);
-      }
-
-      console.log(`❌ Invitation refusée`);
+      await this.friendRepository.remove(allPendingRelations);
+      console.log(`❌ ${allPendingRelations.length} relation(s) refusée(s) et supprimée(s)`);
+      
       return null;
     }
   }
 
-  /**
-   * Annuler une invitation envoyée
-   */
   async cancelRequest(userId: string, friendId: string): Promise<void> {
-    const friend = await this.friendRepository.findOne({
-      where: { id: friendId, userId, status: FriendStatus.PENDING },
+    console.log(`🗑️ Annulation de l'invitation ${friendId}`);
+
+    const sentRequest = await this.friendRepository.findOne({
+      where: { 
+        id: friendId, 
+        userId,
+        status: FriendStatus.PENDING 
+      },
     });
 
-    if (!friend || !friend.friendUserId) {
+    if (!sentRequest || !sentRequest.friendUserId) {
       throw new NotFoundException('Invitation non trouvée');
     }
 
     const reciprocal = await this.friendRepository.findOne({
       where: {
-        userId: friend.friendUserId,
+        userId: sentRequest.friendUserId,
         friendUserId: userId,
         status: FriendStatus.PENDING,
       },
     });
 
     if (reciprocal) {
-      await this.friendRepository.remove([friend, reciprocal]);
+      await this.friendRepository.remove([sentRequest, reciprocal]);
     } else {
-      await this.friendRepository.remove(friend);
+      await this.friendRepository.remove(sentRequest);
     }
 
-    console.log(`🗑️ Invitation annulée`);
+    console.log(`🗑️ Invitation annulée avec succès`);
   }
 }

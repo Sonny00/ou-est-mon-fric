@@ -5,11 +5,10 @@ import '../../../data/models/user_model.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/services/api_service.dart';
 import '../../../data/services/token_storage.dart';
+import '../../../data/services/socket_service.dart'; // ⭐ AJOUTER
 import '../../tabs/providers/tabs_provider.dart';
 import '../../friends/providers/friends_provider.dart';
 import '../../activity/providers/activity_provider.dart';
-import '../../../data/services/token_storage.dart';
-
 
 final apiServiceProvider = Provider<ApiService>((ref) {
   return ApiService();
@@ -30,56 +29,53 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final Ref _ref;
 
   AuthNotifier(this._repository, this._ref) : super(const AsyncValue.loading()) {
-    // ✅ Vérifier l'authentification au démarrage
     checkAuth();
   }
 
-  /// ✅ Vérifier si l'utilisateur est déjà connecté (avec token)
- /// ✅ Vérifier si l'utilisateur est déjà connecté (avec token)
-Future<void> checkAuth() async {
-  print('🔍 === VÉRIFICATION AUTH ===');
-  
-  try {
-    // 1. Vérifier si un token existe
-    final savedToken = await TokenStorage.getToken();
-    final savedUser = await TokenStorage.getUser();
-    
-    print('Token en storage: ${savedToken != null ? "✅" : "❌"}');
-    print('User en storage: ${savedUser != null ? "✅" : "❌"}');
-    
-    if (savedToken == null) {
-      print('❌ Pas de token → Déconnecté');
-      state = const AsyncValue.data(null);
-      return;
-    }
-
-    // 2. Vérifier que le token est encore valide en appelant /auth/me
-    print('✅ Token trouvé, vérification validité...');
+  Future<void> checkAuth() async {
+    print('🔍 === VÉRIFICATION AUTH ===');
     
     try {
-      final user = await _repository.getMe();
-      state = AsyncValue.data(user);
-      print('✅ Token valide → Utilisateur connecté: ${user.name}');
-    } catch (e) {
-      // Token invalide ou expiré
-      print('❌ Token invalide/expiré: $e');
+      final savedToken = await TokenStorage.getToken();
+      final savedUser = await TokenStorage.getUser();
       
-      // Si c'est une erreur 401, supprimer le token
-      if (e.toString().contains('401') || e.toString().contains('Non autorisé')) {
-        print('🗑️ Suppression du token invalide');
-        await TokenStorage.deleteToken();
+      print('Token en storage: ${savedToken != null ? "✅" : "❌"}');
+      print('User en storage: ${savedUser != null ? "✅" : "❌"}');
+      
+      if (savedToken == null) {
+        print('❌ Pas de token → Déconnecté');
+        state = const AsyncValue.data(null);
+        return;
+      }
+
+      print('✅ Token trouvé, vérification validité...');
+      
+      try {
+        final user = await _repository.getMe();
+        state = AsyncValue.data(user);
+        print('✅ Token valide → Utilisateur connecté: ${user.name}');
+        
+        // ⭐ AJOUTER : Connecter WebSocket
+        _ref.read(socketServiceProvider).connect(user.id, savedToken);
+        
+      } catch (e) {
+        print('❌ Token invalide/expiré: $e');
+        
+        if (e.toString().contains('401') || e.toString().contains('Non autorisé')) {
+          print('🗑️ Suppression du token invalide');
+          await TokenStorage.deleteToken();
+        }
+        
+        state = const AsyncValue.data(null);
       }
       
+      print('=========================');
+    } catch (e, st) {
+      print('❌ Erreur checkAuth: $e');
       state = const AsyncValue.data(null);
     }
-    
-    print('=========================');
-  } catch (e, st) {
-    print('❌ Erreur checkAuth: $e');
-    state = const AsyncValue.data(null);
   }
-}
-  /// S'inscrire
+
   Future<void> register({
     required String name,
     required String email,
@@ -98,7 +94,11 @@ Future<void> checkAuth() async {
       );
       
       final user = result['user'];
+      final token = result['token'];
       state = AsyncValue.data(user);
+      
+      // ⭐ AJOUTER : Connecter WebSocket
+      _ref.read(socketServiceProvider).connect(user.id, token);
       
       print('✅ AuthNotifier: Inscription réussie - ${user.name}');
     } catch (e, st) {
@@ -108,7 +108,6 @@ Future<void> checkAuth() async {
     }
   }
 
-  /// Se connecter
   Future<void> login({
     required String email,
     required String password,
@@ -123,7 +122,11 @@ Future<void> checkAuth() async {
       );
       
       final user = result['user'];
+      final token = result['token'];
       state = AsyncValue.data(user);
+      
+      // ⭐ AJOUTER : Connecter WebSocket
+      _ref.read(socketServiceProvider).connect(user.id, token);
       
       print('✅ AuthNotifier: Connexion réussie - ${user.name}');
     } catch (e, st) {
@@ -133,7 +136,6 @@ Future<void> checkAuth() async {
     }
   }
 
-  /// Se connecter avec Google
   Future<void> signInWithGoogle() async {
     state = const AsyncValue.loading();
     try {
@@ -142,7 +144,11 @@ Future<void> checkAuth() async {
       final result = await _repository.signInWithGoogle();
       
       final user = result['user'];
+      final token = result['token'];
       state = AsyncValue.data(user);
+      
+      // ⭐ AJOUTER : Connecter WebSocket
+      _ref.read(socketServiceProvider).connect(user.id, token);
       
       print('✅ AuthNotifier: Connexion Google réussie - ${user.name}');
     } catch (e, st) {
@@ -152,20 +158,19 @@ Future<void> checkAuth() async {
     }
   }
 
-  /// ✅ Déconnexion avec nettoyage complet
   Future<void> logout() async {
     try {
       print('🔓 AuthNotifier: Déconnexion en cours...');
       
-      // 1. Supprimer le token
+      // ⭐ AJOUTER : Déconnecter WebSocket
+      _ref.read(socketServiceProvider).disconnect();
+      
       await _repository.logout();
       
-      // 2. Invalider tous les providers pour nettoyer le cache
       _ref.invalidate(tabsProvider);
       _ref.invalidate(friendsNotifierProvider);
       _ref.invalidate(activityProvider);
       
-      // 3. Mettre l'état à null
       state = const AsyncValue.data(null);
       
       print('✅ AuthNotifier: Déconnexion réussie');
@@ -177,7 +182,6 @@ Future<void> checkAuth() async {
   }
 }
 
-/// ✅ Helper pour savoir si l'utilisateur est connecté
 final isAuthenticatedProvider = Provider<bool>((ref) {
   final authState = ref.watch(authStateProvider);
   return authState.when(
@@ -187,7 +191,6 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   );
 });
 
-/// ✅ Helper pour récupérer l'utilisateur actuel
 final currentUserProvider = Provider<UserModel?>((ref) {
   final authState = ref.watch(authStateProvider);
   return authState.when(

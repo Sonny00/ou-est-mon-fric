@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/friends_provider.dart';
+import '../../auth/providers/auth_provider.dart'; // ⭐ AJOUTER cet import
+
 
 class AddFriendScreen extends ConsumerStatefulWidget {
   const AddFriendScreen({Key? key}) : super(key: key);
@@ -257,7 +259,7 @@ class _VerifiedFriendTab extends ConsumerStatefulWidget {
 
 class _VerifiedFriendTabState extends ConsumerState<_VerifiedFriendTab> {
   final _formKey = GlobalKey<FormState>();
-  final _tagController = TextEditingController(); // ⭐ AJOUTÉ
+  final _tagController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -268,6 +270,8 @@ class _VerifiedFriendTabState extends ConsumerState<_VerifiedFriendTab> {
 
   @override
   Widget build(BuildContext context) {
+    final sentRequestsAsync = ref.watch(sentRequestsProvider);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Form(
@@ -316,7 +320,7 @@ class _VerifiedFriendTabState extends ConsumerState<_VerifiedFriendTab> {
 
             const SizedBox(height: 24),
 
-            // ⭐ Champ TAG
+            // Champ TAG
             TextFormField(
               controller: _tagController,
               style: const TextStyle(color: AppColors.textPrimary),
@@ -339,9 +343,54 @@ class _VerifiedFriendTabState extends ConsumerState<_VerifiedFriendTab> {
                 }
                 return null;
               },
+              onChanged: (value) => setState(() {}),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // ⭐ AJOUTER : Warning si invitation déjà envoyée
+            sentRequestsAsync.when(
+              data: (sentRequests) {
+                final tag = _tagController.text.trim();
+                if (tag.isEmpty) return const SizedBox.shrink();
+
+                final alreadySent = sentRequests.any((req) => 
+                  req.displayTag == tag
+                );
+
+                if (alreadySent) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Iconsax.info_circle, size: 16, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Invitation déjà envoyée à cet utilisateur',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+
+            const SizedBox(height: 8),
 
             // Bouton envoyer invitation
             ElevatedButton.icon(
@@ -382,38 +431,64 @@ class _VerifiedFriendTabState extends ConsumerState<_VerifiedFriendTab> {
   }
 
   Future<void> _handleSendRequest() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+  final tag = _tagController.text.trim();
 
-    try {
-      // ⭐ Envoyer l'invitation par TAG
-      await ref.read(friendsNotifierProvider.notifier).sendFriendRequestByTag(
-            _tagController.text.trim(),
-          );
+  // ⭐ CORRIGER : Utiliser currentUserProvider
+  final currentUser = ref.read(currentUserProvider);
+  
+  if (currentUser != null && currentUser.tag == tag) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tu ne peux pas t\'ajouter toi-même'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+    return;
+  }
 
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invitation envoyée !'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+  setState(() => _isLoading = true);
+
+  try {
+    await ref.read(friendsNotifierProvider.notifier).sendFriendRequestByTag(tag);
+
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invitation envoyée !'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      
+      ref.invalidate(sentRequestsProvider);
+    }
+  } catch (e) {
+    if (mounted) {
+      String errorMessage = 'Erreur lors de l\'envoi de l\'invitation';
+      
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('409') || errorStr.contains('conflict')) {
+        errorMessage = 'Une invitation est déjà en attente pour cet utilisateur';
+      } else if (errorStr.contains('404') || errorStr.contains('not found')) {
+        errorMessage = 'Aucun utilisateur trouvé avec ce tag';
+      } else if (errorStr.contains('400') || errorStr.contains('bad request')) {
+        errorMessage = 'Tu ne peux pas t\'ajouter toi-même';
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
+}
 }

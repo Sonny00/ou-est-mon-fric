@@ -15,8 +15,8 @@ import {
 import { FriendsService } from './friends.service';
 import { CreateFriendDto } from './dto/create-friend.dto';
 import { UpdateFriendDto } from './dto/update-friend.dto';
-import { SendFriendRequestDto } from './dto/send-friend-request.dto'; // ⭐ AJOUTER
-import { RespondFriendRequestDto } from './dto/respond-friend-request.dto'; // ⭐ AJOUTER
+import { SendFriendRequestDto } from './dto/send-friend-request.dto';
+import { RespondFriendRequestDto } from './dto/respond-friend-request.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -24,8 +24,6 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 export class FriendsController {
   constructor(private readonly friendsService: FriendsService) {}
-
-  // ========== ROUTES EXISTANTES (garder tel quel) ==========
 
   @Get()
   async findAll(@CurrentUser() user: any) {
@@ -82,12 +80,10 @@ export class FriendsController {
     };
   }
 
-  // ========== ⭐ NOUVELLES ROUTES POUR AMIS VÉRIFIÉS ==========
-
   /**
-   * Envoyer une invitation d'ami vérifié
+   * ⭐ Envoyer une invitation par TAG
    * POST /friends/requests/send
-   * Body: { email: "ami@example.com" }
+   * Body: { tag: "Sonny#7842" }
    */
   @Post('requests/send')
   @HttpCode(HttpStatus.CREATED)
@@ -105,7 +101,6 @@ export class FriendsController {
 
   /**
    * Récupérer les invitations reçues
-   * GET /friends/requests/received
    */
   @Get('requests/received')
   async getReceivedRequests(@CurrentUser() user: any) {
@@ -118,7 +113,6 @@ export class FriendsController {
 
   /**
    * Récupérer les invitations envoyées
-   * GET /friends/requests/sent
    */
   @Get('requests/sent')
   async getSentRequests(@CurrentUser() user: any) {
@@ -153,7 +147,6 @@ export class FriendsController {
 
   /**
    * Annuler une invitation envoyée
-   * DELETE /friends/requests/:id/cancel
    */
   @Delete('requests/:id/cancel')
   @HttpCode(HttpStatus.OK)
@@ -162,6 +155,6 @@ export class FriendsController {
     return {
       success: true,
       message: 'Friend request cancelled successfully',
-    };
+      };
   }
 }
