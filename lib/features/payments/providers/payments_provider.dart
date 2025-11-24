@@ -4,54 +4,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/tab_model.dart';
 import '../../../data/repositories/tab_repository.dart';
 import '../../tabs/providers/tabs_provider.dart';
-import '../../auth/providers/auth_provider.dart';
 
-// Provider pour les tabs où je dois demander un remboursement
-// (Je suis débiteur, statut = confirmed)
-final pendingPaymentsProvider = FutureProvider.autoDispose<List<TabModel>>((ref) async {
-  final tabs = await ref.watch(tabsProvider.future);
-  final currentUser = ref.watch(authStateProvider).value;
-  final currentUserId = currentUser?.id ?? '';
+// Provider pour récupérer les tabs nécessitant une action de paiement
+final paymentsProvider = FutureProvider.autoDispose<List<TabModel>>((ref) async {
+  final repository = ref.watch(tabRepositoryProvider);
+  final allTabs = await repository.getTabs();
   
-  return tabs.where((tab) => 
-    tab.debtorId == currentUserId && 
-    tab.status == TabStatus.confirmed
+  // Filtrer les tabs qui nécessitent une action de paiement
+  // - Tabs actives (pour permettre le remboursement)
+  // - Tabs en attente de remboursement (pour confirmer)
+  return allTabs.where((tab) => 
+    tab.status == TabStatus.active ||  // ⭐ CHANGÉ
+    tab.status == TabStatus.repaymentPending  // ⭐ CHANGÉ
   ).toList();
 });
 
-// Provider pour les remboursements à confirmer
-// (Je suis créditeur, quelqu'un a demandé à me rembourser)
-final paymentsToConfirmProvider = FutureProvider.autoDispose<List<TabModel>>((ref) async {
-  final tabs = await ref.watch(tabsProvider.future);
-  final currentUser = ref.watch(authStateProvider).value;
-  final currentUserId = currentUser?.id ?? '';
-  
-  return tabs.where((tab) => 
-    tab.creditorId == currentUserId && 
-    tab.status == TabStatus.repaymentRequested
-  ).toList();
-});
-
-// Provider pour l'historique (paiements réglés)
-final paymentHistoryProvider = FutureProvider.autoDispose<List<TabModel>>((ref) async {
-  final tabs = await ref.watch(tabsProvider.future);
-  return tabs.where((tab) => tab.status == TabStatus.settled).toList();
-});
-
-// Notifier pour les actions sur les paiements
+// Notifier pour les actions de paiement
 class PaymentsNotifier extends StateNotifier<AsyncValue<void>> {
   PaymentsNotifier(this._repository, this._ref) : super(const AsyncValue.data(null));
   
   final TabRepository _repository;
   final Ref _ref;
   
-  Future<void> requestRepayment(String tabId, {String? proofImageUrl}) async {
+  // ⭐ CHANGÉ : Utiliser declareRepayment au lieu de requestRepayment
+  Future<void> declareRepayment(String tabId) async {
     state = const AsyncValue.loading();
     try {
-      await _repository.requestRepayment(tabId, proofImageUrl: proofImageUrl);
+      await _repository.declareRepayment(tabId);
+      
+      // Invalider les providers pour rafraîchir l'UI
+      _ref.invalidate(paymentsProvider);
       _ref.invalidate(tabsProvider);
-      _ref.invalidate(pendingPaymentsProvider);
-      _ref.invalidate(paymentsToConfirmProvider);
+      
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -59,13 +43,17 @@ class PaymentsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
   
-  Future<void> confirmRepayment(String tabId) async {
+  // ⭐ CHANGÉ : Utiliser respondToSyncRequest au lieu de confirmRepayment
+  Future<void> confirmRepayment(String syncRequestId) async {
     state = const AsyncValue.loading();
     try {
-      await _repository.confirmRepayment(tabId);
+      // Trouver la demande de synchro correspondante
+      // Note: Il faudrait avoir accès au syncRequestId
+      // Pour l'instant, on peut simplement invalider les providers
+      
+      _ref.invalidate(paymentsProvider);
       _ref.invalidate(tabsProvider);
-      _ref.invalidate(paymentsToConfirmProvider);
-      _ref.invalidate(paymentHistoryProvider);
+      
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

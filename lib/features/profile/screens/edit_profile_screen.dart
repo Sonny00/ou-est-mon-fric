@@ -185,7 +185,7 @@ class _EditTabScreenState extends ConsumerState<EditTabScreen> {
                       maxLines: 3,
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        hintText: 'Ex: 🍕 Pizza vendredi soir',
+                        hintText: 'Ex: taxi, dîner, etc.',
                         hintStyle: const TextStyle(color: AppColors.textSecondary),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

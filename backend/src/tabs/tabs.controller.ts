@@ -19,9 +19,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('tabs')
-@UseGuards(JwtAuthGuard) // ← Protéger toutes les routes
+@UseGuards(JwtAuthGuard)
 export class TabsController {
   constructor(private readonly tabsService: TabsService) {}
+
+  // ========== ROUTES DE BASE ==========
 
   @Get()
   async findAll(@CurrentUser() user: any) {
@@ -48,7 +50,7 @@ export class TabsController {
     return {
       success: true,
       data,
-      message: 'Tab created successfully',
+      message: 'Tab créé avec succès',
     };
   }
 
@@ -62,7 +64,7 @@ export class TabsController {
     return {
       success: true,
       data,
-      message: 'Tab updated successfully',
+      message: 'Tab mis à jour',
     };
   }
 
@@ -73,43 +75,67 @@ export class TabsController {
     return {
       success: true,
       data,
+      message: 'Tab supprimé',
     };
   }
 
-  @Post(':id/confirm')
-  @HttpCode(HttpStatus.OK)
-  async confirmTab(@Param('id') id: string, @CurrentUser() user: any) {
-    const data = await this.tabsService.confirmTab(id, user.id);
+  // ========== NOUVELLES ROUTES DE SYNCHRONISATION ==========
+
+  /**
+   * ⭐ Récupérer les demandes de synchronisation en attente
+   * GET /tabs/sync/pending
+   */
+  @Get('sync/pending')
+  async getPendingSyncRequests(@CurrentUser() user: any) {
+    const data = await this.tabsService.getPendingSyncRequests(user.id);
     return {
       success: true,
       data,
-      message: 'Tab confirmed',
     };
   }
 
-  @Post(':id/request-repayment')
+  /**
+   * ⭐ Répondre à une demande de synchronisation
+   * POST /tabs/sync/:id/respond
+   * Body: { action: 'accept' | 'reject', rejectionReason?: string }
+   */
+  @Post('sync/:id/respond')
   @HttpCode(HttpStatus.OK)
-  async requestRepayment(
+  async respondToSyncRequest(
     @Param('id') id: string,
-    @Body('proofImageUrl') proofImageUrl: string | undefined,
+    @Body() body: { action: 'accept' | 'reject'; rejectionReason?: string },
     @CurrentUser() user: any,
   ) {
-    const data = await this.tabsService.requestRepayment(id, user.id, proofImageUrl);
+    const data = await this.tabsService.respondToSyncRequest(
+      user.id,
+      id,
+      body.action,
+      body.rejectionReason,
+    );
     return {
       success: true,
       data,
-      message: 'Repayment requested',
+      message: body.action === 'accept' 
+        ? 'Synchronisation acceptée' 
+        : 'Synchronisation refusée',
     };
   }
 
-  @Post(':id/confirm-repayment')
+  /**
+   * ⭐ Déclarer un remboursement
+   * POST /tabs/:id/repayment
+   */
+  @Post(':id/repayment')
   @HttpCode(HttpStatus.OK)
-  async confirmRepayment(@Param('id') id: string, @CurrentUser() user: any) {
-    const data = await this.tabsService.confirmRepayment(id, user.id);
+  async declareRepayment(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    const data = await this.tabsService.declareRepayment(user.id, id);
     return {
       success: true,
       data,
-      message: 'Repayment confirmed',
+      message: 'Demande de remboursement envoyée',
     };
   }
 }

@@ -1,5 +1,8 @@
+// lib/data/repositories/tab_repository.dart
+
 import '../services/api_service.dart';
 import '../models/tab_model.dart';
+import '../models/tab_sync_request_model.dart';
 
 class TabRepository {
   final ApiService _apiService;
@@ -70,49 +73,60 @@ class TabRepository {
       throw Exception('Impossible de supprimer la tab: $e');
     }
   }
-  
-  Future<TabModel> confirmTab(String id) async {
+
+  // ⭐ NOUVEAU : Déclarer un remboursement
+  Future<TabSyncRequest> declareRepayment(String tabId) async {
     try {
-      final response = await _apiService.post('/tabs/$id/confirm');
+      final response = await _apiService.post('/tabs/$tabId/repayment');
       
       if (response['success'] == true) {
-        return TabModel.fromJson(response['data']);
+        return TabSyncRequest.fromJson(response['data']);
       } else {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      throw Exception('Impossible de confirmer la tab: $e');
+      throw Exception('Impossible de déclarer le remboursement: $e');
     }
   }
-  
-  Future<TabModel> requestRepayment(String id, {String? proofImageUrl}) async {
+
+  // ⭐ NOUVEAU : Récupérer les demandes de synchro en attente
+  Future<List<TabSyncRequest>> getPendingSyncRequests() async {
+    try {
+      final response = await _apiService.get('/tabs/sync/pending');
+      
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data'];
+        return data.map((json) => TabSyncRequest.fromJson(json)).toList();
+      } else {
+        throw Exception('API returned success: false');
+      }
+    } catch (e) {
+      throw Exception('Impossible de charger les demandes: $e');
+    }
+  }
+
+  // ⭐ NOUVEAU : Répondre à une demande de synchro
+  Future<TabSyncRequest> respondToSyncRequest(
+    String syncRequestId,
+    String action, {
+    String? rejectionReason,
+  }) async {
     try {
       final response = await _apiService.post(
-        '/tabs/$id/request-repayment',
-        data: {'proofImageUrl': proofImageUrl},
+        '/tabs/sync/$syncRequestId/respond',
+        data: {
+          'action': action,
+          if (rejectionReason != null) 'rejectionReason': rejectionReason,
+        },
       );
       
       if (response['success'] == true) {
-        return TabModel.fromJson(response['data']);
+        return TabSyncRequest.fromJson(response['data']);
       } else {
         throw Exception('API returned success: false');
       }
     } catch (e) {
-      throw Exception('Impossible de demander le remboursement: $e');
-    }
-  }
-  
-  Future<TabModel> confirmRepayment(String id) async {
-    try {
-      final response = await _apiService.post('/tabs/$id/confirm-repayment');
-      
-      if (response['success'] == true) {
-        return TabModel.fromJson(response['data']);
-      } else {
-        throw Exception('API returned success: false');
-      }
-    } catch (e) {
-      throw Exception('Impossible de confirmer le remboursement: $e');
+      throw Exception('Impossible de répondre à la demande: $e');
     }
   }
 }

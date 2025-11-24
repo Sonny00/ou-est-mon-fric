@@ -461,6 +461,8 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+// lib/features/friends/screens/friends_screen.dart
+
 class _FriendCard extends StatelessWidget {
   final Friend friend;
   final String searchQuery;
@@ -486,35 +488,88 @@ class _FriendCard extends StatelessWidget {
             decoration: AppStyles.card(),
             child: Row(
               children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-                  child: Center(
-                    child: Text(
-                      friend.initials,
-                      style: const TextStyle(
-                        color: AppColors.background,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                // Avatar avec badge vérifié
+                Stack(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          friend.initials,
+                          style: const TextStyle(
+                            color: AppColors.background,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    // ⭐ Badge vérifié
+                    if (friend.isVerified)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.background,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Iconsax.verify5, // ⭐ Icône pleine pour vérifié
+                            size: 14,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        friend.name,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      // ⭐ Nom avec badge inline
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              friend.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (friend.isVerified) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Iconsax.verify5,
+                              size: 16,
+                              color: AppColors.accent,
+                            ),
+                          ],
+                        ],
                       ),
-                      if (friend.phoneNumber != null) ...[
+                      if (friend.phoneNumber != null || friend.displayTag != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          friend.phoneNumber!,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textTertiary),
+                          friend.displayTag ?? friend.phoneNumber!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textTertiary,
+                          ),
                         ),
                       ],
                     ],

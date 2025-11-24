@@ -2,28 +2,24 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/tab_model.dart';
+import '../../../data/models/tab_sync_request_model.dart';
 import '../../../data/repositories/tab_repository.dart';
 import '../../../data/services/api_service.dart';
-import '../../activity/providers/activity_provider.dart'; // ← AJOUTER CET IMPORT
 
-// Provider pour ApiService (singleton)
 final apiServiceProvider = Provider<ApiService>((ref) {
   return ApiService();
 });
 
-// Provider pour TabRepository
 final tabRepositoryProvider = Provider<TabRepository>((ref) {
   final apiService = ref.watch(apiServiceProvider);
   return TabRepository(apiService);
 });
 
-// Provider pour la liste des tabs
 final tabsProvider = FutureProvider.autoDispose<List<TabModel>>((ref) async {
   final repository = ref.watch(tabRepositoryProvider);
   return repository.getTabs();
 });
 
-// Provider pour une tab spécifique
 final tabByIdProvider = FutureProvider.autoDispose.family<TabModel, String>(
   (ref, id) async {
     final repository = ref.watch(tabRepositoryProvider);
@@ -31,7 +27,12 @@ final tabByIdProvider = FutureProvider.autoDispose.family<TabModel, String>(
   },
 );
 
-// State notifier pour les actions
+// ⭐ NOUVEAU : Demandes de synchronisation en attente
+final pendingSyncRequestsProvider = FutureProvider.autoDispose<List<TabSyncRequest>>((ref) async {
+  final repository = ref.watch(tabRepositoryProvider);
+  return repository.getPendingSyncRequests();
+});
+
 class TabsNotifier extends StateNotifier<AsyncValue<void>> {
   TabsNotifier(this._repository, this._ref) : super(const AsyncValue.data(null));
   
@@ -43,10 +44,10 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.createTab(data);
       _ref.invalidate(tabsProvider);
-      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
   
@@ -55,10 +56,10 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.updateTab(id, data);
       _ref.invalidate(tabsProvider);
-      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
   
@@ -67,47 +68,61 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.deleteTab(id);
       _ref.invalidate(tabsProvider);
-      _ref.invalidate(activityProvider); // ← AJOUTER
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
-  
-  Future<void> confirmTab(String id) async {
+
+  // ⭐ NOUVEAU : Déclarer un remboursement
+  Future<void> declareRepayment(String tabId) async {
     state = const AsyncValue.loading();
     try {
-      await _repository.confirmTab(id);
+      await _repository.declareRepayment(tabId);
+      
       _ref.invalidate(tabsProvider);
-      _ref.invalidate(activityProvider); // ← AJOUTER
+      
+      await Future.delayed(const Duration(milliseconds: 800));
+      try {
+        await _ref.read(tabsProvider.future);
+      } catch (_) {}
+      
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
-  
-Future<void> requestRepayment(String tabId) async {
-  state = const AsyncValue.loading();
-  try {
-    await _repository.requestRepayment(tabId);
-    _ref.invalidate(tabsProvider);
-    state = const AsyncValue.data(null);
-  } catch (e, st) {
-    state = AsyncValue.error(e, st);
-    rethrow;
+
+  // ⭐ NOUVEAU : Répondre à une demande de synchro
+  Future<void> respondToSyncRequest(
+    String syncRequestId,
+    String action, {
+    String? rejectionReason,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.respondToSyncRequest(
+        syncRequestId,
+        action,
+        rejectionReason: rejectionReason,
+      );
+      
+      _ref.invalidate(tabsProvider);
+      _ref.invalidate(pendingSyncRequestsProvider);
+      
+      await Future.delayed(const Duration(milliseconds: 800));
+      try {
+        await _ref.read(tabsProvider.future);
+      } catch (_) {}
+      
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
   }
-}
- Future<void> confirmRepayment(String tabId) async {
-  state = const AsyncValue.loading();
-  try {
-    await _repository.confirmRepayment(tabId);
-    _ref.invalidate(tabsProvider);
-    state = const AsyncValue.data(null);
-  } catch (e, st) {
-    state = AsyncValue.error(e, st);
-    rethrow;
-  }
-}
 }
 
 final tabsNotifierProvider = StateNotifierProvider<TabsNotifier, AsyncValue<void>>((ref) {

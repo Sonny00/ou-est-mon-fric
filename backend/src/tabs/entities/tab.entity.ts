@@ -9,16 +9,19 @@ import {
 } from 'typeorm';
 
 export enum TabStatus {
-  PENDING = 'pending',
-  CONFIRMED = 'confirmed',
-  REPAYMENT_REQUESTED = 'repayment_requested',
-  SETTLED = 'settled',
+  ACTIVE = 'active',                       // ⭐ Tab active
+  REPAYMENT_PENDING = 'repayment_pending', // Remboursement en attente
+  SETTLED = 'settled',                     // Remboursé
 }
 
 @Entity('tabs')
 export class TabEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  // ⭐ NOUVEAU : À qui appartient ce tab
+  @Column('uuid')
+  userId: string;
 
   // ========== PAS DE RELATIONS = PAS DE CONTRAINTES ==========
   @Column('uuid')
@@ -50,9 +53,17 @@ export class TabEntity {
   @Column({
     type: 'enum',
     enum: TabStatus,
-    default: TabStatus.PENDING,
+    default: TabStatus.ACTIVE,
   })
   status: TabStatus;
+
+  // ⭐ NOUVEAU : ID du tab lié chez l'ami (si synchronisé)
+  @Column('uuid', { nullable: true })
+  linkedTabId: string;
+
+  // ⭐ NOUVEAU : ID de l'ami concerné
+  @Column('uuid', { nullable: true })
+  linkedFriendId: string;
 
   @Column({ nullable: true })
   proofImageUrl: string;

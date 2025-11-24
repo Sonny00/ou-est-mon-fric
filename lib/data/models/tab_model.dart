@@ -1,15 +1,14 @@
 // lib/data/models/tab_model.dart
 
 enum TabStatus {
-  pending,
-  confirmed,
-  repaymentRequested,
+  active,              // ⭐ CHANGÉ
+  repaymentPending,    // ⭐ CHANGÉ
   settled,
-  disputed,
 }
 
 class TabModel {
   final String id;
+  final String userId; // ⭐ NOUVEAU
   final String creditorId;
   final String creditorName;
   final String debtorId;
@@ -19,15 +18,18 @@ class TabModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final TabStatus status;
+  final String? linkedTabId; // ⭐ NOUVEAU
+  final String? linkedFriendId; // ⭐ NOUVEAU
   final String? proofImageUrl;
   final DateTime? repaymentRequestedAt;
   final DateTime? settledAt;
   final String? disputeReason;
-  final DateTime? repaymentDeadline; // ← AJOUTÉ
-  final bool deadlineNotificationSent; // ← AJOUTÉ
+  final DateTime? repaymentDeadline;
+  final bool deadlineNotificationSent;
 
   TabModel({
     required this.id,
+    required this.userId,
     required this.creditorId,
     required this.creditorName,
     required this.debtorId,
@@ -37,12 +39,14 @@ class TabModel {
     required this.createdAt,
     required this.updatedAt,
     required this.status,
+    this.linkedTabId,
+    this.linkedFriendId,
     this.proofImageUrl,
     this.repaymentRequestedAt,
     this.settledAt,
     this.disputeReason,
-    this.repaymentDeadline, // ← AJOUTÉ
-    this.deadlineNotificationSent = false, // ← AJOUTÉ
+    this.repaymentDeadline,
+    this.deadlineNotificationSent = false,
   });
 
   bool iOwe(String currentUserId) {
@@ -50,11 +54,11 @@ class TabModel {
   }
 
   bool canConfirmRepayment(String currentUserId) {
-    return creditorId == currentUserId && status == TabStatus.repaymentRequested;
+    return creditorId == currentUserId && status == TabStatus.repaymentPending;
   }
 
   bool canRequestRepayment(String currentUserId) {
-    return debtorId == currentUserId && status == TabStatus.confirmed;
+    return debtorId == currentUserId && status == TabStatus.active;
   }
 
   bool get hasDeadline => repaymentDeadline != null;
@@ -77,56 +81,55 @@ class TabModel {
     if (daysUntilDeadline == 1) return 'Demain';
     return 'Dans $daysUntilDeadline jours';
   }
-  // =========================================
 
   factory TabModel.fromJson(Map<String, dynamic> json) {
-  return TabModel(
-    id: json['id'],
-    creditorId: json['creditorId'],
-    creditorName: json['creditorName'],
-    debtorId: json['debtorId'],
-    debtorName: json['debtorName'],
-    amount: _parseAmount(json['amount']),
-    description: json['description'],
-    createdAt: DateTime.parse(json['createdAt']),
-    updatedAt: DateTime.parse(json['updatedAt']),
-    status: _parseStatus(json['status']), // ⭐ UTILISER LA NOUVELLE MÉTHODE
-    proofImageUrl: json['proofImageUrl'],
-    repaymentRequestedAt: json['repaymentRequestedAt'] != null
-        ? DateTime.parse(json['repaymentRequestedAt'])
-        : null,
-    settledAt: json['settledAt'] != null
-        ? DateTime.parse(json['settledAt'])
-        : null,
-    disputeReason: json['disputeReason'],
-    repaymentDeadline: json['repaymentDeadline'] != null
-        ? DateTime.parse(json['repaymentDeadline'])
-        : null,
-    deadlineNotificationSent: json['deadlineNotificationSent'] ?? false,
-  );
-}
-
-static TabStatus _parseStatus(dynamic status) {
-  if (status == null) return TabStatus.pending;
-  
-  final statusStr = status.toString().toLowerCase().replaceAll('_', '');
-  
-  switch (statusStr) {
-    case 'pending':
-      return TabStatus.pending;
-    case 'confirmed':
-      return TabStatus.confirmed;
-    case 'repaymentrequested':
-      return TabStatus.repaymentRequested;
-    case 'settled':
-      return TabStatus.settled;
-    case 'disputed':
-      return TabStatus.disputed;
-    default:
-      print('⚠️ Unknown status: $status, defaulting to pending');
-      return TabStatus.pending;
+    return TabModel(
+      id: json['id'],
+      userId: json['userId'],
+      creditorId: json['creditorId'],
+      creditorName: json['creditorName'],
+      debtorId: json['debtorId'],
+      debtorName: json['debtorName'],
+      amount: _parseAmount(json['amount']),
+      description: json['description'],
+      createdAt: DateTime.parse(json['createdAt']),
+      updatedAt: DateTime.parse(json['updatedAt']),
+      status: _parseStatus(json['status']),
+      linkedTabId: json['linkedTabId'],
+      linkedFriendId: json['linkedFriendId'],
+      proofImageUrl: json['proofImageUrl'],
+      repaymentRequestedAt: json['repaymentRequestedAt'] != null
+          ? DateTime.parse(json['repaymentRequestedAt'])
+          : null,
+      settledAt: json['settledAt'] != null
+          ? DateTime.parse(json['settledAt'])
+          : null,
+      disputeReason: json['disputeReason'],
+      repaymentDeadline: json['repaymentDeadline'] != null
+          ? DateTime.parse(json['repaymentDeadline'])
+          : null,
+      deadlineNotificationSent: json['deadlineNotificationSent'] ?? false,
+    );
   }
-}
+
+  static TabStatus _parseStatus(dynamic status) {
+    if (status == null) return TabStatus.active;
+    
+    final statusStr = status.toString().toLowerCase().replaceAll('_', '');
+    
+    switch (statusStr) {
+      case 'active':
+        return TabStatus.active;
+      case 'repaymentpending':
+        return TabStatus.repaymentPending;
+      case 'settled':
+        return TabStatus.settled;
+      default:
+        print('⚠️ Unknown status: $status, defaulting to active');
+        return TabStatus.active;
+    }
+  }
+
   static double _parseAmount(dynamic value) {
     if (value is double) return value;
     if (value is int) return value.toDouble();
@@ -137,6 +140,7 @@ static TabStatus _parseStatus(dynamic status) {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'userId': userId,
       'creditorId': creditorId,
       'creditorName': creditorName,
       'debtorId': debtorId,
@@ -146,13 +150,14 @@ static TabStatus _parseStatus(dynamic status) {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'status': status.toString().split('.').last,
+      'linkedTabId': linkedTabId,
+      'linkedFriendId': linkedFriendId,
       'proofImageUrl': proofImageUrl,
       'repaymentRequestedAt': repaymentRequestedAt?.toIso8601String(),
       'settledAt': settledAt?.toIso8601String(),
       'disputeReason': disputeReason,
       'repaymentDeadline': repaymentDeadline?.toIso8601String(),
       'deadlineNotificationSent': deadlineNotificationSent,
-      // ========================================
     };
   }
 
@@ -162,14 +167,15 @@ static TabStatus _parseStatus(dynamic status) {
     DateTime? repaymentRequestedAt,
     DateTime? settledAt,
     String? disputeReason,
-    double? amount, // ← AJOUTÉ
-    String? description, // ← AJOUTÉ
-    DateTime? repaymentDeadline, // ← AJOUTÉ
-    bool clearDeadline = false, // ← AJOUTÉ pour pouvoir supprimer la deadline
-    bool? deadlineNotificationSent, // ← AJOUTÉ
+    double? amount,
+    String? description,
+    DateTime? repaymentDeadline,
+    bool clearDeadline = false,
+    bool? deadlineNotificationSent,
   }) {
     return TabModel(
       id: id,
+      userId: userId,
       creditorId: creditorId,
       creditorName: creditorName,
       debtorId: debtorId,
@@ -179,6 +185,8 @@ static TabStatus _parseStatus(dynamic status) {
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       status: status ?? this.status,
+      linkedTabId: linkedTabId,
+      linkedFriendId: linkedFriendId,
       proofImageUrl: proofImageUrl ?? this.proofImageUrl,
       repaymentRequestedAt: repaymentRequestedAt ?? this.repaymentRequestedAt,
       settledAt: settledAt ?? this.settledAt,

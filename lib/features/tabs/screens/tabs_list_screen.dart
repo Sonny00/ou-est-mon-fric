@@ -12,7 +12,7 @@ import 'create_tab_screen.dart';
 import 'edit_tab_screen.dart'; 
 import '../../auth/providers/auth_provider.dart'; 
 import '../../payments/screens/payments_screen.dart';
-
+import 'sync_requests_screen.dart'; // ⭐ AJOUTER
 
 class TabsListScreen extends ConsumerStatefulWidget {
   const TabsListScreen({Key? key}) : super(key: key);
@@ -29,6 +29,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
     final tabsAsync = ref.watch(tabsProvider);
     final currentUser = ref.watch(authStateProvider).value; 
     final currentUserId = currentUser?.id ?? '';
+    final pendingSyncCount = ref.watch(pendingSyncRequestsProvider).value?.length ?? 0; // ⭐ AJOUTER
     
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -36,7 +37,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
       appBar: AppBar(
         title: const Text('OuEstMonFric'),
         actions: [
-           IconButton(
+          IconButton(
             icon: const Icon(Iconsax.wallet_money, size: 22),
             onPressed: () {
               Navigator.push(
@@ -47,9 +48,46 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Iconsax.notification, size: 22),
-            onPressed: () {},
+          // ⭐ MODIFIÉ : Badge de notification
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Iconsax.notification, size: 22),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SyncRequestsScreen(),
+                    ),
+                  );
+                },
+              ),
+              if (pendingSyncCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$pendingSyncCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           IconButton(
             icon: const Icon(Iconsax.user, size: 22),
@@ -119,7 +157,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
-                mainAxisAlignment: MainAxisAlignment.center, 
+                  mainAxisAlignment: MainAxisAlignment.center, 
                   children: [
                     _FilterChip(
                       label: 'Tout',
@@ -159,7 +197,7 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                             return TabCard(
                               tab: filteredTabs[index],
                               currentUserId: currentUserId,
-                              onTap: () => _showTabDetails(filteredTabs[index]), // ← MODIFIER cette ligne
+                              onTap: () => _showTabDetails(filteredTabs[index]),
                             );
                           },
                         ),
@@ -187,10 +225,10 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
           child: InkWell(
             onTap: _showCreateTabDialog,
             borderRadius: BorderRadius.circular(16),
-            child: Container(
+            child: const SizedBox(
               width: 56,
               height: 56,
-              child: const Icon(
+              child: Icon(
                 Iconsax.add,
                 color: AppColors.background,
                 size: 24,
@@ -267,8 +305,9 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
   }
 
   void _showTabDetails(TabModel tab) {
-  final currentUser = ref.read(authStateProvider).value;  // ✅ AJOUTER
-  final currentUserId = currentUser?.id ?? '';  
+    final currentUser = ref.read(authStateProvider).value;
+    final currentUserId = currentUser?.id ?? '';
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -288,7 +327,6 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle
                 Center(
                   child: Container(
                     width: 40,
@@ -301,7 +339,6 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Header
                 Row(
                   children: [
                     Container(
@@ -350,7 +387,6 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
 
                 const SizedBox(height: 24),
 
-                // Description
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -383,7 +419,6 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
 
                 const SizedBox(height: 16),
 
-                // Deadline si présente
                 if (tab.hasDeadline) ...[
                   Container(
                     width: double.infinity,
@@ -435,101 +470,103 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
                   const SizedBox(height: 16),
                 ],
 
+                // ⭐ NOUVEAU : Bouton "J'ai remboursé"
+                if (tab.status == TabStatus.active && tab.linkedTabId != null)
+                  Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            try {
+                              await ref.read(tabsNotifierProvider.notifier).declareRepayment(tab.id);
+                              
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Demande de remboursement envoyée'),
+                                    backgroundColor: AppColors.accent,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Erreur: $e'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Iconsax.money_send),
+                          label: const Text('J\'ai remboursé'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.background,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+
                 // Actions
-            // Actions
-Row(
-  children: [
-    // ⭐ Bouton Confirmer (seulement si pending et je suis le débiteur)
-    if (tab.status == TabStatus.pending && tab.debtorId == currentUserId)
-      Expanded(
-        child: ElevatedButton.icon(
-          onPressed: () async {
-            Navigator.pop(context); // Fermer le modal
-            try {
-              await ref.read(tabsNotifierProvider.notifier).confirmTab(tab.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Tab confirmée !'),
-                  backgroundColor: AppColors.success,
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditTabScreen(tab: tab),
+                            ),
+                          );
+                          if (result == true) {
+                            ref.refresh(tabsProvider);
+                          }
+                        },
+                        icon: const Icon(Iconsax.edit, size: 18),
+                        label: const Text('Modifier'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          side: const BorderSide(color: AppColors.accent),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showDeleteConfirmation(tab);
+                        },
+                        icon: const Icon(Iconsax.trash, size: 18),
+                        label: const Text('Supprimer'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Erreur: $e'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            }
-          },
-          icon: const Icon(Iconsax.tick_circle, size: 18),
-          label: const Text('Confirmer'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.success,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      ),
-    
-    // Espacement si le bouton confirmer est visible
-    if (tab.status == TabStatus.pending && tab.debtorId == currentUserId)
-      const SizedBox(width: 12),
-    
-    // Bouton Modifier
-    Expanded(
-      child: OutlinedButton.icon(
-        onPressed: () async {
-          Navigator.pop(context);
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => EditTabScreen(tab: tab),
-            ),
-          );
-          if (result == true) {
-            ref.refresh(tabsProvider);
-          }
-        },
-        icon: const Icon(Iconsax.edit, size: 18),
-        label: const Text('Modifier'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.accent,
-          side: const BorderSide(color: AppColors.accent),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    ),
-    
-    const SizedBox(width: 12),
-    
-    // Bouton Supprimer
-    Expanded(
-      child: OutlinedButton.icon(
-        onPressed: () {
-          Navigator.pop(context);
-          _showDeleteConfirmation(tab);
-        },
-        icon: const Icon(Iconsax.trash, size: 18),
-        label: const Text('Supprimer'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.error,
-          side: const BorderSide(color: AppColors.error),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    ),
-  ],
-),
               ],
             ),
           ),
@@ -595,68 +632,55 @@ Row(
       ),
     );
   }
-  // =========================================
   
- List<TabModel> _getFilteredTabs(List<TabModel> tabs) {
-  final currentUser = ref.read(authStateProvider).value;
-  final currentUserId = currentUser?.id ?? '';
-  
-  if (_selectedFilter == 'all') {
-    return tabs.where((tab) => tab.status != TabStatus.settled).toList();
-  } else if (_selectedFilter == 'they_owe') {
-    return tabs.where((tab) => 
-      !tab.iOwe(currentUserId) && tab.status != TabStatus.settled
-    ).toList();
-  } else {
-    return tabs.where((tab) => 
-      tab.iOwe(currentUserId) && tab.status != TabStatus.settled
-    ).toList();
+  List<TabModel> _getFilteredTabs(List<TabModel> tabs) {
+    final currentUser = ref.read(authStateProvider).value;
+    final currentUserId = currentUser?.id ?? '';
+    
+    if (_selectedFilter == 'all') {
+      return tabs.where((tab) => tab.status != TabStatus.settled).toList();
+    } else if (_selectedFilter == 'they_owe') {
+      return tabs.where((tab) => 
+        !tab.iOwe(currentUserId) && tab.status != TabStatus.settled
+      ).toList();
+    } else {
+      return tabs.where((tab) => 
+        tab.iOwe(currentUserId) && tab.status != TabStatus.settled
+      ).toList();
+    }
   }
-}
   
   int _countByType(List<TabModel> tabs, bool theyOwe) {
-  final currentUser = ref.read(authStateProvider).value;
-  final currentUserId = currentUser?.id ?? '';
-  
-  return tabs.where((tab) {
-    if (theyOwe) {
-      return !tab.iOwe(currentUserId) && tab.status != TabStatus.settled;
-    } else {
-      return tab.iOwe(currentUserId) && tab.status != TabStatus.settled;
-    }
-  }).length;
-}
-  
-double _calculateBalance(List<TabModel> tabs) {
-  final currentUser = ref.read(authStateProvider).value;
-  final currentUserId = currentUser?.id ?? '';
-  
-  double total = 0;
-  print('🔍 === CALCUL DE LA BALANCE ===');
-  
-  for (var tab in tabs) {
-    if (tab.status == TabStatus.settled) continue;
+    final currentUser = ref.read(authStateProvider).value;
+    final currentUserId = currentUser?.id ?? '';
     
-    print('📋 Tab: ${tab.description}');
-    print('   Creditor: ${tab.creditorName} (${tab.creditorId})');
-    print('   Debtor: ${tab.debtorName} (${tab.debtorId})');
-    print('   Amount: ${tab.amount}€');
-    print('   iOwe result: ${tab.iOwe(currentUserId)}');  // ✅ CORRIGÉ
-    
-    if (tab.iOwe(currentUserId)) {  // ✅ CORRIGÉ
-      print('   ➖ JE DOIS: -${tab.amount}€');
-      total -= tab.amount;
-    } else {
-      print('   ➕ ON ME DOIT: +${tab.amount}€');
-      total += tab.amount;
-    }
-    print('   Balance courante: $total€');
+    return tabs.where((tab) {
+      if (theyOwe) {
+        return !tab.iOwe(currentUserId) && tab.status != TabStatus.settled;
+      } else {
+        return tab.iOwe(currentUserId) && tab.status != TabStatus.settled;
+      }
+    }).length;
   }
   
-  print('💰 BALANCE FINALE: $total€');
-  print('============================');
-  return total;
-}
+  double _calculateBalance(List<TabModel> tabs) {
+    final currentUser = ref.read(authStateProvider).value;
+    final currentUserId = currentUser?.id ?? '';
+    
+    double total = 0;
+    
+    for (var tab in tabs) {
+      if (tab.status == TabStatus.settled) continue;
+      
+      if (tab.iOwe(currentUserId)) {
+        total -= tab.amount;
+      } else {
+        total += tab.amount;
+      }
+    }
+    
+    return total;
+  }
 }
 
 class _FilterChip extends StatelessWidget {

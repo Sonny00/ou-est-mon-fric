@@ -310,7 +310,7 @@ class _CreateTabScreenState extends ConsumerState<CreateTabScreen> {
                           maxLines: 3,
                           style: const TextStyle(color: AppColors.textPrimary),
                           decoration: InputDecoration(
-                            hintText: 'Ex: 🍕 Pizza vendredi soir',
+                            hintText: 'Exemple: taxi, dîner, etc.',
                             hintStyle: const TextStyle(color: AppColors.textSecondary),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -683,7 +683,7 @@ Future<void> _handleCreateTab() async {
     return;
   }
    
-  final currentUser = ref.read(authStateProvider).value; // ← AJOUTER
+  final currentUser = ref.read(authStateProvider).value;
   final currentUserId = currentUser?.id ?? '';
 
   setState(() => _isLoading = true);
@@ -691,28 +691,33 @@ Future<void> _handleCreateTab() async {
   try {
     final amount = double.parse(_amountController.text);
     
+    // ⭐ IDENTIFIER LE VRAI USER ID DE L'AMI
+    final friendUserId = _selectedFriend!.friendUserId ?? _selectedFriend!.userId;
+    
+    // Si friendUserId == currentUserId, alors l'ami c'est userId, sinon c'est friendUserId
+    final actualFriendUserId = friendUserId == currentUserId 
+        ? _selectedFriend!.userId 
+        : friendUserId;
+    
     print('🎯 === CRÉATION DE TAB ===');
     print('_iOwe (Je leur dois): $_iOwe');
+    print('currentUserId: $currentUserId');
     print('Friend: ${_selectedFriend!.name}');
+    print('actualFriendUserId: $actualFriendUserId');
     print('Amount: $amount€');
     
-final data = {
-  'creditorId': _iOwe 
-      ? (_selectedFriend!.friendUserId ?? _selectedFriend!.id) 
-      : currentUserId,
-  'creditorName': _iOwe ? _selectedFriend!.name : currentUser?.name ?? 'Moi',
-  'debtorId': _iOwe 
-      ? currentUserId 
-      : (_selectedFriend!.friendUserId ?? _selectedFriend!.id),
-  'debtorName': _iOwe ? currentUser?.name ?? 'Moi' : _selectedFriend!.name,
-  'amount': amount,
-  'description': _descriptionController.text,
-  if (_imagePath != null) 'proofImageUrl': _imagePath,
-  
-  // ⭐ AJOUTER CETTE LIGNE
-  if (_selectedDeadline != null) 
-    'repaymentDeadline': _selectedDeadline!.toIso8601String(),
-};
+    final data = {
+      // ⭐ CORRIGÉ : Utiliser actualFriendUserId
+      'creditorId': _iOwe ? actualFriendUserId : currentUserId,
+      'creditorName': _iOwe ? _selectedFriend!.name : currentUser?.name ?? 'Moi',
+      'debtorId': _iOwe ? currentUserId : actualFriendUserId,
+      'debtorName': _iOwe ? currentUser?.name ?? 'Moi' : _selectedFriend!.name,
+      'amount': amount,
+      'description': _descriptionController.text,
+      if (_imagePath != null) 'proofImageUrl': _imagePath,
+      if (_selectedDeadline != null) 
+        'repaymentDeadline': _selectedDeadline!.toIso8601String(),
+    };
 
     print('📤 Data envoyée:');
     print('   creditorId: ${data['creditorId']}');
