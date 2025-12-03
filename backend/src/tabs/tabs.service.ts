@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TabEntity, TabStatus } from './entities/tab.entity';
 import { TabSyncRequestEntity, SyncRequestType, SyncRequestStatus } from './entities/tab-sync-request.entity';
-import { FriendEntity, FriendStatus } from '../friends/entities/friend.entity'; // ⭐ AJOUTER FriendStatus
+import { FriendEntity, FriendStatus } from '../friends/entities/friend.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateTabDto } from './dto/create-tab.dto';
 import { UpdateTabDto } from './dto/update-tab.dto';
@@ -50,12 +50,19 @@ export class TabsService {
     const tab = this.tabRepository.create({
       ...createTabDto,
       userId, // ⭐ Appartient à l'utilisateur
-      linkedFriendId: otherUserId, // ⭐ AJOUTER
+      linkedFriendId: otherUserId,
       status: TabStatus.ACTIVE,
     });
 
     await this.tabRepository.save(tab);
     console.log('✅ Tab créé avec ID:', tab.id);
+
+    // ⭐ NOUVEAU : Notifier l'utilisateur actuel que son tab est créé
+ this.notificationsGateway.sendToUser(userId, 'tab_created', {
+  tabId: tab.id,
+  description: tab.description,
+  amount: tab.amount,
+});
 
     // ⭐ Vérifier si c'est un ami vérifié
     const friendship = await this.friendRepository.findOne({
@@ -100,8 +107,9 @@ export class TabsService {
       await this.syncRequestRepository.save(syncRequest);
       console.log('✅ SyncRequest créé avec ID:', syncRequest.id);
 
-      // ⭐ Notifier l'autre utilisateur
-      this.notificationsGateway.sendToUser(otherUserId, 'tab_sync_request', {
+      // ⭐ NOUVEAU : Notifier avec l'événement sync_request_received
+     this.notificationsGateway.sendToUser(otherUserId, 'sync_request_received', {
+
         syncRequestId: syncRequest.id,
         type: 'create',
         from: {
@@ -117,7 +125,7 @@ export class TabsService {
         },
       });
 
-      console.log(`📤 Notification WebSocket envoyée à ${otherUserId}`);
+      console.log(`📤 Notification sync_request_received envoyée à ${otherUserId}`);
     } else {
       console.log('⚠️ Pas d\'ami vérifié - pas de notification envoyée');
     }
@@ -174,7 +182,7 @@ export class TabsService {
           ...syncRequest.tabData,
           status: TabStatus.ACTIVE,
           linkedTabId: syncRequest.initiatorTabId,
-          linkedFriendId: syncRequest.initiatedBy, // ⭐ AJOUTER
+          linkedFriendId: syncRequest.initiatedBy,
         });
 
         const savedTab = await this.tabRepository.save(newTab);
@@ -188,6 +196,16 @@ export class TabsService {
         syncRequest.targetTabId = savedTab.id;
         
         console.log(`✅ Tab créé chez l'utilisateur ${userId} avec ID ${savedTab.id}`);
+        
+        // ⭐ NOUVEAU : Notifier l'utilisateur cible que son tab est créé
+    this.notificationsGateway.sendToUser(userId, 'tab_created', {
+  tabId: savedTab.id,
+});
+
+this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
+  syncRequestId: syncRequest.id,
+  tabId: syncRequest.initiatorTabId,
+});
       }
 
       // ⭐ Remboursement
@@ -206,6 +224,23 @@ export class TabsService {
         }
         
         console.log(`💰 Remboursement validé pour les tabs ${syncRequest.initiatorTabId} et ${syncRequest.targetTabId}`);
+        
+        // ⭐ NOUVEAU : Notifier les deux parties que les tabs sont remboursés
+        this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'tab_updated', {
+          tabId: syncRequest.initiatorTabId,
+          status: 'settled',
+        });
+        
+        this.notificationsGateway.sendToUser(userId, 'tab_updated', {
+          tabId: syncRequest.targetTabId,
+          status: 'settled',
+        });
+        
+        // ⭐ NOUVEAU : Notifier l'initiateur que son remboursement a été accepté
+        this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
+          syncRequestId: syncRequest.id,
+          type: 'repayment',
+        });
       }
     } else {
       syncRequest.status = SyncRequestStatus.REJECTED;
@@ -213,16 +248,16 @@ export class TabsService {
       syncRequest.respondedAt = new Date();
 
       console.log(`❌ Synchronisation refusée pour ${syncRequestId}`);
+      
+      // ⭐ NOUVEAU : Notifier l'initiateur que sa demande a été refusée
+      this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_rejected', {
+        syncRequestId: syncRequest.id,
+        type: syncRequest.type,
+        rejectionReason,
+      });
     }
 
     await this.syncRequestRepository.save(syncRequest);
-
-    // Notifier l'initiateur
-    this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'tab_sync_response', {
-      syncRequestId: syncRequest.id,
-      action,
-      rejectionReason,
-    });
 
     return syncRequest;
   }
@@ -250,10 +285,8 @@ export class TabsService {
     let otherUserId: string;
     
     if (tab.linkedFriendId) {
-      // Cas 1 : Le tab a déjà un linkedFriendId
       otherUserId = tab.linkedFriendId;
     } else {
-      // Cas 2 : Fallback - identifier via creditorId/debtorId
       otherUserId = tab.creditorId === userId ? tab.debtorId : tab.creditorId;
     }
 
@@ -285,9 +318,15 @@ export class TabsService {
     tab.status = TabStatus.REPAYMENT_PENDING;
     tab.repaymentRequestedAt = new Date();
     await this.tabRepository.save(tab);
+    
+    // ⭐ NOUVEAU : Notifier l'utilisateur actuel que son tab est en attente
+    this.notificationsGateway.sendToUser(userId, 'tab_updated', {
+      tabId: tab.id,
+      status: 'repayment_pending',
+    });
 
-    // Notifier l'autre utilisateur
-    this.notificationsGateway.sendToUser(otherUserId, 'tab_sync_request', {
+    // ⭐ NOUVEAU : Notifier avec l'événement sync_request_received
+    this.notificationsGateway.sendToUser(otherUserId, 'sync_request_received', {
       syncRequestId: syncRequest.id,
       type: 'repayment',
       from: {
@@ -301,7 +340,7 @@ export class TabsService {
       },
     });
 
-    console.log(`📤 Notification remboursement envoyée à ${otherUserId}`);
+    console.log(`📤 Notification sync_request_received (remboursement) envoyée à ${otherUserId}`);
 
     return syncRequest;
   }
@@ -330,12 +369,56 @@ export class TabsService {
   async update(id: string, updateTabDto: UpdateTabDto, userId: string): Promise<TabEntity> {
     const tab = await this.findOne(id, userId);
     Object.assign(tab, updateTabDto);
-    return this.tabRepository.save(tab);
+    const updatedTab = await this.tabRepository.save(tab);
+    
+    // ⭐ NOUVEAU : Notifier l'utilisateur actuel
+    this.notificationsGateway.sendToUser(userId, 'tab_updated', {
+      tabId: updatedTab.id,
+    });
+    
+    // ⭐ NOUVEAU : Si le tab est lié, notifier l'autre utilisateur
+    if (tab.linkedFriendId) {
+      this.notificationsGateway.sendToUser(tab.linkedFriendId, 'tab_updated', {
+        tabId: tab.linkedTabId,
+      });
+    }
+    
+    return updatedTab;
   }
 
-  async remove(id: string, userId: string): Promise<{ deleted: boolean; message: string }> {
-    const tab = await this.findOne(id, userId);
-    await this.tabRepository.remove(tab);
-    return { deleted: true, message: 'Tab supprimé' };
+async remove(id: string, userId: string): Promise<{ deleted: boolean; message: string }> {
+  const tab = await this.findOne(id, userId);
+  
+  console.log('🗑️ Suppression du tab:', {
+    tabId: id,
+    userId,
+    linkedFriendId: tab.linkedFriendId,
+    linkedTabId: tab.linkedTabId,
+  });
+  
+  // ⭐ SAUVEGARDER AVANT suppression
+  const linkedFriendId = tab.linkedFriendId;
+  const linkedTabId = tab.linkedTabId;
+  
+  await this.tabRepository.remove(tab);
+  
+  // ⭐ NOTIFIER l'utilisateur actuel
+  console.log('🔔 Envoi notification tab_deleted à userId:', userId);
+  this.notificationsGateway.sendToUser(userId, 'tab_deleted', {
+    tabId: id,
+  });
+  
+  // ⭐ NOTIFIER l'autre utilisateur si le tab était lié
+  if (linkedFriendId && linkedTabId) {
+    console.log('🔔 Envoi notification tab_deleted à linkedFriendId:', linkedFriendId);
+    this.notificationsGateway.sendToUser(linkedFriendId, 'tab_deleted', {
+      tabId: linkedTabId,
+    });
+  } else {
+    console.log('⚠️ Pas de linkedFriendId/linkedTabId');
   }
+  
+  return { deleted: true, message: 'Tab supprimé' };
+}
+
 }

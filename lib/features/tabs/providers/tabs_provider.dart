@@ -15,9 +15,16 @@ final tabRepositoryProvider = Provider<TabRepository>((ref) {
   return TabRepository(apiService);
 });
 
+// ⭐ AJOUT DES LOGS DE DEBUG
 final tabsProvider = FutureProvider.autoDispose<List<TabModel>>((ref) async {
+  print('🔄 tabsProvider: DÉBUT du chargement...');
+  
   final repository = ref.watch(tabRepositoryProvider);
-  return repository.getTabs();
+  final tabs = await repository.getTabs();
+  
+  print('✅ tabsProvider: ${tabs.length} tabs chargés');
+  
+  return tabs;
 });
 
 final tabByIdProvider = FutureProvider.autoDispose.family<TabModel, String>(
@@ -27,10 +34,19 @@ final tabByIdProvider = FutureProvider.autoDispose.family<TabModel, String>(
   },
 );
 
-// ⭐ NOUVEAU : Demandes de synchronisation en attente
+// ⭐ AJOUT DES LOGS DE DEBUG
 final pendingSyncRequestsProvider = FutureProvider.autoDispose<List<TabSyncRequest>>((ref) async {
+  print('🔔 pendingSyncRequestsProvider: DÉBUT du chargement...');
+  
   final repository = ref.watch(tabRepositoryProvider);
-  return repository.getPendingSyncRequests();
+  final requests = await repository.getPendingSyncRequests();
+  
+  print('📦 pendingSyncRequestsProvider: ${requests.length} demande(s) chargées');
+  for (var req in requests) {
+    print('  - ${req.message}');
+  }
+  
+  return requests;
 });
 
 class TabsNotifier extends StateNotifier<AsyncValue<void>> {
@@ -75,7 +91,6 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  // ⭐ NOUVEAU : Déclarer un remboursement
   Future<void> declareRepayment(String tabId) async {
     state = const AsyncValue.loading();
     try {
@@ -95,7 +110,6 @@ class TabsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  // ⭐ NOUVEAU : Répondre à une demande de synchro
   Future<void> respondToSyncRequest(
     String syncRequestId,
     String action, {

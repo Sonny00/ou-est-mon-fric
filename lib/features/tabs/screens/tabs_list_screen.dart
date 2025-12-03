@@ -25,6 +25,17 @@ class _TabsListScreenState extends ConsumerState<TabsListScreen> {
   String _selectedFilter = 'all';
 
   @override
+  void initState() {
+    super.initState();
+    
+    // ⭐ AJOUTER : Écouter les changements du provider
+    ref.listenManual(tabsProvider, (previous, next) {
+      print('🔄 tabsProvider a changé !');
+      // Le widget va automatiquement se rebuild
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tabsAsync = ref.watch(tabsProvider);
     final currentUser = ref.watch(authStateProvider).value; 
