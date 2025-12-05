@@ -150,117 +150,140 @@ export class TabsService {
    * ⭐ RÉPONDRE À UNE DEMANDE DE SYNCHRO
    */
   async respondToSyncRequest(
-    userId: string,
-    syncRequestId: string,
-    action: 'accept' | 'reject',
-    rejectionReason?: string,
-  ): Promise<TabSyncRequestEntity> {
-    const syncRequest = await this.syncRequestRepository.findOne({
-      where: { id: syncRequestId },
-    });
+  userId: string,
+  syncRequestId: string,
+  action: 'accept' | 'reject',
+  rejectionReason?: string,
+): Promise<TabSyncRequestEntity> {
+  const syncRequest = await this.syncRequestRepository.findOne({
+    where: { id: syncRequestId },
+  });
 
-    if (!syncRequest) {
-      throw new NotFoundException('Demande de synchronisation non trouvée');
-    }
+  if (!syncRequest) {
+    throw new NotFoundException('Demande de synchronisation non trouvée');
+  }
 
-    if (syncRequest.targetUserId !== userId) {
-      throw new ForbiddenException('Cette demande ne vous concerne pas');
-    }
+  if (syncRequest.targetUserId !== userId) {
+    throw new ForbiddenException('Cette demande ne vous concerne pas');
+  }
 
-    if (syncRequest.status !== SyncRequestStatus.PENDING) {
-      throw new BadRequestException('Cette demande a déjà été traitée');
-    }
+  if (syncRequest.status !== SyncRequestStatus.PENDING) {
+    throw new BadRequestException('Cette demande a déjà été traitée');
+  }
 
-    if (action === 'accept') {
-      syncRequest.status = SyncRequestStatus.ACCEPTED;
-      syncRequest.respondedAt = new Date();
+  if (action === 'accept') {
+    syncRequest.status = SyncRequestStatus.ACCEPTED;
+    syncRequest.respondedAt = new Date();
 
-      // ⭐ Créer le tab chez l'utilisateur cible
-      if (syncRequest.type === SyncRequestType.CREATE) {
-        const newTab = this.tabRepository.create({
-          userId, // ⭐ Appartient à l'utilisateur cible
-          ...syncRequest.tabData,
-          status: TabStatus.ACTIVE,
-          linkedTabId: syncRequest.initiatorTabId,
-          linkedFriendId: syncRequest.initiatedBy,
-        });
+    // ⭐ Créer le tab chez l'utilisateur cible
+    if (syncRequest.type === SyncRequestType.CREATE) {
+      const newTab = this.tabRepository.create({
+        userId,
+        ...syncRequest.tabData,
+        status: TabStatus.ACTIVE,
+        linkedTabId: syncRequest.initiatorTabId,
+        linkedFriendId: syncRequest.initiatedBy,
+      });
 
-        const savedTab = await this.tabRepository.save(newTab);
+      const savedTab = await this.tabRepository.save(newTab);
 
-        // Mettre à jour le linkedTabId dans le tab de l'initiateur
-        await this.tabRepository.update(
-          { id: syncRequest.initiatorTabId },
-          { linkedTabId: savedTab.id },
-        );
+      await this.tabRepository.update(
+        { id: syncRequest.initiatorTabId },
+        { linkedTabId: savedTab.id },
+      );
 
-        syncRequest.targetTabId = savedTab.id;
-        
-        console.log(`✅ Tab créé chez l'utilisateur ${userId} avec ID ${savedTab.id}`);
-        
-        // ⭐ NOUVEAU : Notifier l'utilisateur cible que son tab est créé
-    this.notificationsGateway.sendToUser(userId, 'tab_created', {
-  tabId: savedTab.id,
-});
-
-this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
-  syncRequestId: syncRequest.id,
-  tabId: syncRequest.initiatorTabId,
-});
-      }
-
-      // ⭐ Remboursement
-      else if (syncRequest.type === SyncRequestType.REPAYMENT) {
-        // Marquer les deux tabs comme soldés
-        await this.tabRepository.update(
-          { id: syncRequest.initiatorTabId },
-          { status: TabStatus.SETTLED, settledAt: new Date() },
-        );
-
-        if (syncRequest.targetTabId) {
-          await this.tabRepository.update(
-            { id: syncRequest.targetTabId },
-            { status: TabStatus.SETTLED, settledAt: new Date() },
-          );
-        }
-        
-        console.log(`💰 Remboursement validé pour les tabs ${syncRequest.initiatorTabId} et ${syncRequest.targetTabId}`);
-        
-        // ⭐ NOUVEAU : Notifier les deux parties que les tabs sont remboursés
-        this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'tab_updated', {
-          tabId: syncRequest.initiatorTabId,
-          status: 'settled',
-        });
-        
-        this.notificationsGateway.sendToUser(userId, 'tab_updated', {
-          tabId: syncRequest.targetTabId,
-          status: 'settled',
-        });
-        
-        // ⭐ NOUVEAU : Notifier l'initiateur que son remboursement a été accepté
-        this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
-          syncRequestId: syncRequest.id,
-          type: 'repayment',
-        });
-      }
-    } else {
-      syncRequest.status = SyncRequestStatus.REJECTED;
-      syncRequest.rejectionReason = rejectionReason;
-      syncRequest.respondedAt = new Date();
-
-      console.log(`❌ Synchronisation refusée pour ${syncRequestId}`);
+      syncRequest.targetTabId = savedTab.id;
       
-      // ⭐ NOUVEAU : Notifier l'initiateur que sa demande a été refusée
-      this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_rejected', {
+      console.log(`✅ Tab créé chez l'utilisateur ${userId} avec ID ${savedTab.id}`);
+      
+      this.notificationsGateway.sendToUser(userId, 'tab_created', {
+        tabId: savedTab.id,
+      });
+
+      this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
         syncRequestId: syncRequest.id,
-        type: syncRequest.type,
-        rejectionReason,
+        tabId: syncRequest.initiatorTabId,
       });
     }
 
-    await this.syncRequestRepository.save(syncRequest);
+    // ⭐ Remboursement
+    else if (syncRequest.type === SyncRequestType.REPAYMENT) {
+      await this.tabRepository.update(
+        { id: syncRequest.initiatorTabId },
+        { status: TabStatus.SETTLED, settledAt: new Date() },
+      );
 
-    return syncRequest;
+      if (syncRequest.targetTabId) {
+        await this.tabRepository.update(
+          { id: syncRequest.targetTabId },
+          { status: TabStatus.SETTLED, settledAt: new Date() },
+        );
+      }
+      
+      console.log(`💰 Remboursement validé pour les tabs ${syncRequest.initiatorTabId} et ${syncRequest.targetTabId}`);
+      
+      this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'tab_updated', {
+        tabId: syncRequest.initiatorTabId,
+        status: 'settled',
+      });
+      
+      this.notificationsGateway.sendToUser(userId, 'tab_updated', {
+        tabId: syncRequest.targetTabId,
+        status: 'settled',
+      });
+      
+      this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
+        syncRequestId: syncRequest.id,
+        type: 'repayment',
+      });
+    }
+    
+    // ⭐ AJOUTER ICI - Suppression
+    else if (syncRequest.type === SyncRequestType.DELETE) {
+      // Supprimer le tab de l'utilisateur cible
+      if (syncRequest.targetTabId) {
+        const targetTab = await this.tabRepository.findOne({
+          where: { id: syncRequest.targetTabId, userId },
+        });
+        
+        if (targetTab) {
+          await this.tabRepository.remove(targetTab);
+          
+          console.log(`🗑️ Tab supprimé chez l'utilisateur ${userId}: ${syncRequest.targetTabId}`);
+          
+          // Notifier l'utilisateur cible
+          this.notificationsGateway.sendToUser(userId, 'tab_deleted', {
+            tabId: syncRequest.targetTabId,
+          });
+          
+          // Notifier l'initiateur
+          this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_accepted', {
+            syncRequestId: syncRequest.id,
+            type: 'delete',
+          });
+        }
+      }
+    }
+    
+  } else {
+    // ⭐ REFUS
+    syncRequest.status = SyncRequestStatus.REJECTED;
+    syncRequest.rejectionReason = rejectionReason;
+    syncRequest.respondedAt = new Date();
+
+    console.log(`❌ Synchronisation refusée pour ${syncRequestId}`);
+    
+    this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_rejected', {
+      syncRequestId: syncRequest.id,
+      type: syncRequest.type,
+      rejectionReason,
+    });
   }
+
+  await this.syncRequestRepository.save(syncRequest);
+
+  return syncRequest;
+}
 
   /**
    * ⭐ DÉCLARER UN REMBOURSEMENT
@@ -389,33 +412,109 @@ this.notificationsGateway.sendToUser(syncRequest.initiatedBy, 'sync_request_acce
 async remove(id: string, userId: string): Promise<{ deleted: boolean; message: string }> {
   const tab = await this.findOne(id, userId);
   
-  console.log('🗑️ Suppression du tab:', {
+  console.log('🗑️ Demande de suppression du tab:', {
     tabId: id,
     userId,
     linkedFriendId: tab.linkedFriendId,
     linkedTabId: tab.linkedTabId,
   });
-  
-  // ⭐ SAUVEGARDER AVANT suppression
+
+  const user = await this.userRepository.findOne({ where: { id: userId } });
+  if (!user) {
+    throw new NotFoundException('Utilisateur non trouvé');
+  }
+
+  // ⭐ Si le tab est lié à un ami vérifié, créer une demande de synchro
+  if (tab.linkedFriendId && tab.linkedTabId) {
+    // Vérifier si c'est un ami vérifié
+    const friendship = await this.friendRepository.findOne({
+      where: [
+        { 
+          userId, 
+          friendUserId: tab.linkedFriendId, 
+          status: FriendStatus.ACCEPTED, 
+          isVerified: true 
+        },
+        { 
+          userId: tab.linkedFriendId, 
+          friendUserId: userId, 
+          status: FriendStatus.ACCEPTED, 
+          isVerified: true 
+        },
+      ],
+    });
+
+    if (friendship && friendship.isVerified) {
+      // ⭐ Créer une demande de synchronisation pour suppression
+      const syncRequest = this.syncRequestRepository.create({
+        type: SyncRequestType.DELETE,
+        initiatedBy: userId,
+        initiatedByName: user.name,
+        targetUserId: tab.linkedFriendId,
+        initiatorTabId: tab.id,
+        targetTabId: tab.linkedTabId,
+        tabData: {
+          description: tab.description,
+          amount: tab.amount,
+          creditorId: tab.creditorId,
+          creditorName: tab.creditorName,
+          debtorId: tab.debtorId,
+          debtorName: tab.debtorName,
+        },
+        message: `${user.name} a supprimé un tab: "${tab.description}" - ${tab.amount}€`,
+        status: SyncRequestStatus.PENDING,
+      });
+
+      await this.syncRequestRepository.save(syncRequest);
+      console.log('✅ SyncRequest suppression créé:', syncRequest.id);
+
+      // Supprimer le tab de l'utilisateur actuel
+      await this.tabRepository.remove(tab);
+
+      // Notifier l'utilisateur actuel
+      this.notificationsGateway.sendToUser(userId, 'tab_deleted', {
+        tabId: id,
+      });
+
+      // ⭐ Notifier l'autre utilisateur avec sync_request_received
+      this.notificationsGateway.sendToUser(tab.linkedFriendId, 'sync_request_received', {
+        syncRequestId: syncRequest.id,
+        type: 'delete',
+        from: {
+          id: user.id,
+          name: user.name,
+          tag: user.tag,
+        },
+        tab: {
+          description: tab.description,
+          amount: tab.amount,
+          creditorName: tab.creditorName,
+          debtorName: tab.debtorName,
+        },
+      });
+
+      console.log(`📤 Notification sync_request_received (suppression) envoyée à ${tab.linkedFriendId}`);
+
+      return { deleted: true, message: 'Demande de suppression envoyée' };
+    }
+  }
+
+  // ⭐ Si pas d'ami vérifié ou pas de tab lié, suppression directe
   const linkedFriendId = tab.linkedFriendId;
   const linkedTabId = tab.linkedTabId;
   
   await this.tabRepository.remove(tab);
   
-  // ⭐ NOTIFIER l'utilisateur actuel
-  console.log('🔔 Envoi notification tab_deleted à userId:', userId);
+  // Notifier l'utilisateur actuel
   this.notificationsGateway.sendToUser(userId, 'tab_deleted', {
     tabId: id,
   });
   
-  // ⭐ NOTIFIER l'autre utilisateur si le tab était lié
+  // Si le tab était lié, notifier l'autre utilisateur
   if (linkedFriendId && linkedTabId) {
-    console.log('🔔 Envoi notification tab_deleted à linkedFriendId:', linkedFriendId);
     this.notificationsGateway.sendToUser(linkedFriendId, 'tab_deleted', {
       tabId: linkedTabId,
     });
-  } else {
-    console.log('⚠️ Pas de linkedFriendId/linkedTabId');
   }
   
   return { deleted: true, message: 'Tab supprimé' };
